@@ -45,20 +45,6 @@ function Area:append(item)
   table.insert(self.items, item)
 end
 
--- Remove an item from a given index in the item table.
-function Area:remove_index(index)
-  local item = self.items[index]
-  if item then
-    -- Turn off highlight
-    if item.is_area then
-      item:select_off_recursive()
-    else
-      item:select_off()
-    end
-    table.remove(self.items, index)
-  end
-end
-
 -- Returns if current area contains a given area.
 function Area:contains(item)
   if not item.is_area then return end
@@ -79,6 +65,21 @@ end
 
 function Area:is_empty() return #self.items == 0 end
 
+-- Remove an item from a given index in the item table.
+function Area:remove_index(index)
+  local item = self.items[index]
+  if item then
+    -- Turn off highlight
+    if item.is_area then
+      item:select_off_recursive()
+    else
+      item:select_off()
+    end
+    table.remove(self.items, index)
+  end
+end
+
+
 -- Remove a specific area from area's item table.
 function Area:remove_item(item)
   if self.nav then
@@ -86,6 +87,7 @@ function Area:remove_item(item)
     self.nav:emit_signal("nav::area_removed", self, item)
   end
   item:select_off_recursive()
+  item:reset_visited_recursive()
   --if self.items[self.index] == item then
   --  self.index = 1
   --end
@@ -219,10 +221,12 @@ function Area:iter(amount)
   return self.items[self.index]
 end
 
+-- only max if it has child areas?
 function Area:max_index_recursive()
-  self.index = #self.items
   for i = 1, #self.items do
     if self.items[i].is_area then
+      print("area "..self.name.. " contains area children:maxing its index")
+      self.index = #self.items
       self.items[i]:max_index_recursive()
     end
   end
@@ -249,14 +253,39 @@ function Area:reset_visited_recursive()
   end
 end
 
+function Area:foreach(func)
+  for i = 1, #self.items do
+    func(self.items[i])
+  end
+end
+
+-- Ensure that every child has a reference to the nav
+-- Should be called on root area.
+function Area:verify_nav_references()
+  if self.parent and not self.nav then
+    self.nav = self.parent.nav
+  end
+
+  for i = 1, #self.items do
+    if self.items[i].is_area then
+      self.items[i]:verify_nav_references()
+    end
+  end
+end
+
 -- Print area contents.
-function Area:dump(space)
+function Area:dump()
+  print("\nDUMP: Current pos is "..self.name.."("..self.index..")")
+  self:_dump()
+end
+
+function Area:_dump(space)
   space = space or ""
   print(space.."'"..self.name.."["..tostring(self.index).."]': "..#self.items.." items")
   space = space .. "  "
   for i = 1, #self.items do
     if self.items[i].is_area then
-      self.items[i]:dump(space .. "  ")
+      self.items[i]:_dump(space .. "  ")
     end
   end
 end

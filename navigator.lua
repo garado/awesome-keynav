@@ -4,10 +4,11 @@
 
 local awful = require("awful")
 local gobject = require("gears.object")
-local area = require("ui.nav.area")
+
+local path = (...):match("(.-)[^%.]+$")
 
 -- For printing stacktrace
-local debug_mode = false
+local debug_mode = true
 local spaces = ""
 local function set_spaces()
   spaces = spaces .. "  "
@@ -27,7 +28,7 @@ function Navigator:new(args)
   args = args or {}
 
   local o = gobject{}
-  o.root  = area:new({
+  o.root  = require(path .. "area"):new({
     name = "root",
     circular = true,
     nav = o,
@@ -42,6 +43,7 @@ function Navigator:new(args)
   o.shift_active = false
 
   o:connect_signal("nav::area_removed", function(navigator, parent, removed_area)
+    navprint("Caught remove area signal for "..removed_area.name.." from "..parent.name)
     self:handle_removed_area(navigator, parent, removed_area)
   end)
 
@@ -104,8 +106,9 @@ end
 
 -- Returns true if the target area is a direct neighbor of the
 -- starting area, false otherwise
-function Navigator:is_direct_neighbor(target)
-  local start_area = self.start_area
+function Navigator:is_direct_neighbor(start_area, target)
+  navprint("::is_direct_neighbor")
+  set_spaces()
   if not start_area.parent then return false end
   return start_area.parent:contains(target)
 end
@@ -123,8 +126,8 @@ function Navigator:handle_removed_area(navigator, parent, removed_area)
     local new_area, new_index = self:find_next_area(parent, 1)
     navigator.curr_area = new_area
     navigator.curr_area.index = new_index
-    navprint("new area is "..self.curr_area.name.." at index "..self.curr_area.index)
-    self:select_toggle()
+    navprint("new area is "..navigator.curr_area.name.." at index "..navigator.curr_area.index)
+    navigator:select_toggle()
   end
   remove_spaces()
 end
@@ -206,6 +209,20 @@ function Navigator:find_next_area(start_area, direction)
   --  if area.index == #area.items and right then area.index = 1 end
   --end
 
+  -- edge case:
+  -- the start area's current index is visited,
+  -- and the current index is at an edge,
+  -- and the area is circular.
+  -- in this case force iterate to make the start area wrap around to the
+  -- next element, and then start our search from there.
+  --local index = start_area.index
+  --local at_edge = index == 1 or index == #start_area.items
+  ----local visited_current = start_area.items[index].visited
+  --if start_area.circular and at_edge then
+  --  print("IM FUCKING CIRCUALR")
+  --  start_area:iter(direction)
+  --end
+
   -- look through area's item table for next navitem to select
   for i = area.index, bounds, direction do
     navprint("checking "..area.name.."["..i.."]:")
@@ -221,7 +238,8 @@ function Navigator:find_next_area(start_area, direction)
       navprint("is area called "..item.name)
 
       -- increment index only for direct neighbors
-      local direct_neighbor = self:is_direct_neighbor(item)
+      navprint("Checking if direct neighbor")
+      local direct_neighbor = self:is_direct_neighbor(area, item)
 
       if right and direct_neighbor then
         navprint("it is a neighbor to the right. setting index to 1")
@@ -235,7 +253,8 @@ function Navigator:find_next_area(start_area, direction)
       if direct_neighbor then
         navprint("it is a direct neighbor of the ACTUAL starting area "..self.start_area.name)
       else
-        navprint("it is NOT a direct neighbor of the ACTUAL starting area "..self.start_area.name)
+        navprint("either it is NOT a direct neighbor of the ACTUAL starting area, or the starting area was removed")
+        --navprint("it is NOT a direct neighbor of the ACTUAL starting area "..self.start_area.name)
       end
 
       return self:find_next_area(item, direction)
@@ -301,11 +320,16 @@ function Navigator:iter_between_areas(val)
   self.curr_area.visited = true
   local start_area = self:parent()
 
-  -- the parent's currently selected item is the current area
-  -- so we need to iterate the parent to make sure it doesnt search the 
-  -- current area again
-  navprint("iterating parent by "..val.." so we don't search the current area "..self.curr_area.name.." again")
-  start_area:iter(val)
+  -- find_next_area doesn't handle circular stuff very well
+  -- maybe it should
+  -- ohhh god
+  local at_edge = start_area.index == 1 or start_area.index == #start_area.items
+  if start_area.circular and at_edge then
+    start_area:iter(val)
+    if not start_area.parent and val < 0 then
+      start_area:max_index_recursive()
+    end
+  end
 
   local next_area, new_index = self:find_next_area(start_area, val)
   self.curr_area = next_area
@@ -367,41 +391,30 @@ function Navigator:iter_within_area(val)
   end
 end
 
--- When navigating between rows,
--- j/k should move to the next row.
--- Pressing tab should move to the next parent area.
-function Navigator:iter_row(key, default)
-  navprint("::iter_row")
+-- When navigating within a row:
+-- h/l should move left and right through it like normal
+-- j/k should move to the next area
+function Navigator:iter_row(type, amount)
+  navprint("::iter_row: received "..type.." by "..amount)
   set_spaces()
 
-  local vertical = key == "j" or key == "k"
-  local horizontal = key == "h" or key == "l"
-  local jump = key == "tab" or key == "backspace"
-
-  local amt
-  if key == "j" or key == "l" or key == "tab" then
-    amt = 1
-  else
-    amt = -1
-  end
-
-  if vertical then
+  if type == "vertical" then
     local old_index = self.curr_area.index
-    self:iter_between_areas(amt)
+    self:iter_between_areas(amount)
     if self.last_area.parent == self.curr_area.parent then
       self.curr_area.index = old_index
     end
-  elseif horizontal then
-    self:iter_within_area(amt)
-  elseif jump then
+  elseif type == "horizontal" then
+    self:iter_within_area(amount)
+  elseif type == "jump" then
     local parent = self.curr_area.parent
     local row_within_root = not (parent and parent.parent)
     local is_grid_element = parent and parent.is_grid_container
     if row_within_root or not is_grid_element then
-      self:iter_between_areas(amt)
+      self:iter_between_areas(amount)
     else
       self.curr_area = self.curr_area.parent
-      self:iter_between_areas(amt)
+      self:iter_between_areas(amount)
     end
   end
 end
@@ -460,60 +473,34 @@ function Navigator:get_rule(key)
 end
 
 -- Execute function for direction keys (hjkl/arrows)
-function Navigator:key(type, amount)
-  navprint("::key: determining function for "..self.curr_area.name)
+-- Types: horizontal vertical jump release
+function Navigator:handle_key(type, amount)
+  navprint("::key: determining function for navigating through "..self.curr_area.name)
   set_spaces()
+
+  navprint("Type is "..type.." and amount is "..amount)
 
   self.start_area   = self.curr_area
   self.start_index  = self.curr_area.index
 
-  -- RULES TEMPORARILY BEING TAKEN OUT
-  --local area_name   = self.curr_area.name
-  --local rule_exists = self.rules and self.rules[area_name] and self.rules[area_name][key]
-  --if rule_exists then
-  --  local rule = self:get_rule(key)
-  --  local custom_nav_logic = false
-  --  local amount = rule
-  --  if type(rule) == "function" then
-  --    amount, custom_nav_logic = rule(self.curr_area.index)
-  --  end
-  --  if not custom_nav_logic then
-  --    self:iter_within_area(amount)
-  --  end
-  --  return
-  --end
-
-  -- if self.curr_area.is_row then
-  --   navprint("is row!")
-  --   self:iter_row(type)
-  -- elseif self.curr_area.is_column then
-  --   navprint("is col!")
-  --   self:iter_col(type)
-  -- elseif type == "jump" then
-  -- elseif key == "tab" then
-  --   self:tab()
-  -- elseif key == "backspace" then
-  --   self:backspace()
-  -- else
-  --   self:iter_within_area(amount)
-  -- end
-end
-
-function Navigator:backspace()
-  self.start_area = self.curr_area
-  self.start_index = self.curr_area.index
-  self:iter_between_areas(-1)
-end
-
-function Navigator:tab()
-  self.start_area = self.curr_area
-  self.start_index = self.curr_area.index
-  self:iter_between_areas(1)
+  -- Order matters here!
+  if type == "release" then
+    self:release()
+  elseif self.curr_area.is_row then
+    self:iter_row(type, amount)
+  elseif self.curr_area.is_col then
+    self:iter_col(type, amount)
+  elseif type == "jump" then
+    self:iter_between_areas(amount)
+  else
+    self:iter_within_area(amount)
+  end
 end
 
 function Navigator:start()
   self.curr_area = self.root
   self:select_toggle()
+  self.root:verify_nav_references()
 
   local function keypressed(_, _, key, _)
     navprint("keypressed: curr area is "..self.curr_area.name)
@@ -523,41 +510,34 @@ function Navigator:start()
     spaces = ""
     if key ~= "Return" and key ~= "q"  then self:select_toggle() end
 
-    local type
+    -- Shift + Tab should act as backspace
+    if key == "Shift_L" or key == "Shift_R" then
+      self.shift_active = true
+    end
+    if key == "Tab" and self.shift_active then key = "BackSpace" end
+
+    -- Determine the navigation type
+    local valid_types = {
+      ["vertical"] = true,
+      ["horizontal"] = true,
+      ["jump"] = true,
+      ["release"] = true,
+    }
+
+    local type = ""
     if key == "j" or key == "k" then type = "vertical" end
     if key == "h" or key == "l" then type = "horizontal" end
-    if key == "Tab" or key == "Backspace" then type = "jump" end
+    if key == "Tab" or key == "BackSpace" then type = "jump" end
+    if key == "Return" then type = "release" end
 
-    local amt
-    if key == "j" or key == "l" or key == "tab" then amt = 1 end
-    if key == "h" or key == "k" or key == "backspace" then amt = -1 end
+    -- Determine if navigating left or right through the tree
+    local amt = 0
+    if key == "j" or key == "l" or key == "Tab" then amt = 1 end
+    if key == "h" or key == "k" or key == "BackSpace" then amt = -1 end
 
-    self:key(type, amt)
+    if valid_types[type] then self:handle_key(type, amt) end
 
-    if     key == "h" or key == "H" then
-      self:key("h", -1)
-    elseif key == "j" or key == "J" then
-      self:key("j", 1)
-    elseif key == "k" or key == "K" then
-      self:key("k", -1)
-    elseif key == "l" or key == "L" then
-      self:key("l", 1)
-    elseif key == "BackSpace" then
-      self:key("backspace", _)
-    elseif key == "Tab" then
-      if self.shift_active then
-        print("shift tab")
-        self:key("backspace", _)
-      else
-        self:key("tab", _)
-      end
-      --self:tab()
-    elseif key == "Return" then
-      self:release()
-    elseif key == "Shift_L" or key == "Shift_R" then
-      self.shift_active = true
-    elseif key == "q" then -- debug: print current hierarchy
-      print("\nDUMP: Current pos is "..self.curr_area.name.."("..self.curr_area.index..")")
+    if key == "q" then -- debug: print current hierarchy
       self.root:dump()
     end
 

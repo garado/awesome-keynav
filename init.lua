@@ -1,5 +1,5 @@
 return {
-  navitem   = require("ui.nav.navitem"),
-  navigator = require("ui.nav.navigator"),
-  area      = require("ui.nav.area"),
+  navitem   = require(... .. ".navitem"),
+  area      = require(... .. ".area"),
+  navigator = require(... .. ".navigator"),
 }
