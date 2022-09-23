@@ -1,7 +1,7 @@
 # ⌨️ Keynav
 This is a library for making AwesomeWM widgets keyboard-navigable.
 
-In my config, I have a dashboard that has widgets... a lot of them. And I'm a Vim nerd so I need my keyboard navigation. I didn't like having to use the mouse to control my dashboard, so I made this out of sheer annoyance. I hope you find it useful!
+In my config, I have a [dashboard](https://github.com/garado/cozy) that has widgets... a lot of them. And I'm a Vim nerd so I need my keyboard navigation. I didn't like having to use the mouse to control my dashboard, so I made this out of sheer annoyance. I hope you find it useful!
 
 ## The basics
 In order to make widgets keyboard navigable, you need to:

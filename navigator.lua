@@ -8,7 +8,7 @@ local gobject = require("gears.object")
 local path = (...):match("(.-)[^%.]+$")
 
 -- For printing stacktrace
-local debug_mode = true
+local debug_mode = false
 local spaces = ""
 local function set_spaces()
   spaces = spaces .. "  "
@@ -560,16 +560,17 @@ function Navigator:start()
     autostart = true,
     keypressed_callback = keypressed,
     keyreleased_callback = keyreleased,
-    stop_callback = function()
-      self.curr_area = self.root
-      self.root:reset()
-    end
   }
+end
+
+function Navigator:pause()
 end
 
 function Navigator:stop()
   awesome.emit_signal("nav::area_changed", "")
   self.root:select_off_recursive()
+  self.curr_area = self.root
+  self.root:reset()
   self.keygrabber:stop()
 end
 
