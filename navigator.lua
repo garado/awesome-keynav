@@ -497,73 +497,84 @@ function Navigator:handle_key(type, amount)
   end
 end
 
+function Navigator:keypressed(_, _, key, _)
+  navprint("keypressed: curr area is "..self.curr_area.name)
+  self.root:reset_visited_recursive()
+  self.last_area = self.curr_area
+  --self:check_curr_area_exists()
+  spaces = ""
+  if key ~= "Return" and key ~= "q"  then self:select_toggle() end
+
+  -- Shift + Tab should act as backspace
+  if key == "Shift_L" or key == "Shift_R" then
+    self.shift_active = true
+  end
+  if key == "Tab" and self.shift_active then key = "BackSpace" end
+
+  -- Determine the navigation type
+  local valid_types = {
+    ["vertical"] = true,
+    ["horizontal"] = true,
+    ["jump"] = true,
+    ["release"] = true,
+  }
+
+  local type = ""
+  if key == "j" or key == "k" then type = "vertical" end
+  if key == "h" or key == "l" then type = "horizontal" end
+  if key == "Tab" or key == "BackSpace" then type = "jump" end
+  if key == "Return" then type = "release" end
+
+  -- Determine if navigating left or right through the tree
+  local amt = 0
+  if key == "j" or key == "l" or key == "Tab" then amt = 1 end
+  if key == "h" or key == "k" or key == "BackSpace" then amt = -1 end
+
+  if valid_types[type] then self:handle_key(type, amt) end
+
+  if key == "q" then -- debug: print current hierarchy
+    self.root:dump()
+  end
+
+  if key ~= "Return" and key ~= "q" then self:select_toggle() end
+  self.last_key = "key"
+  if self.last_area ~= self.curr_area and self.last_area ~= "" then
+    awesome.emit_signal("nav::area_changed", self.last_area.name)
+  end
+end
+
+function Navigator:keyreleased(_, _, key, _)
+  if key == "Shift_R" or key == "Shift_L" then
+    self.shift_active = false
+  end
+end
+
 function Navigator:start()
   self.curr_area = self.root
   self:select_toggle()
   self.root:verify_nav_references()
 
-  local function keypressed(_, _, key, _)
-    navprint("keypressed: curr area is "..self.curr_area.name)
-    self.root:reset_visited_recursive()
-    self.last_area = self.curr_area
-    --self:check_curr_area_exists()
-    spaces = ""
-    if key ~= "Return" and key ~= "q"  then self:select_toggle() end
-
-    -- Shift + Tab should act as backspace
-    if key == "Shift_L" or key == "Shift_R" then
-      self.shift_active = true
-    end
-    if key == "Tab" and self.shift_active then key = "BackSpace" end
-
-    -- Determine the navigation type
-    local valid_types = {
-      ["vertical"] = true,
-      ["horizontal"] = true,
-      ["jump"] = true,
-      ["release"] = true,
-    }
-
-    local type = ""
-    if key == "j" or key == "k" then type = "vertical" end
-    if key == "h" or key == "l" then type = "horizontal" end
-    if key == "Tab" or key == "BackSpace" then type = "jump" end
-    if key == "Return" then type = "release" end
-
-    -- Determine if navigating left or right through the tree
-    local amt = 0
-    if key == "j" or key == "l" or key == "Tab" then amt = 1 end
-    if key == "h" or key == "k" or key == "BackSpace" then amt = -1 end
-
-    if valid_types[type] then self:handle_key(type, amt) end
-
-    if key == "q" then -- debug: print current hierarchy
-      self.root:dump()
-    end
-
-    if key ~= "Return" and key ~= "q" then self:select_toggle() end
-    self.last_key = "key"
-    if self.last_area ~= self.curr_area and self.last_area ~= "" then
-      awesome.emit_signal("nav::area_changed", self.last_area.name)
-    end
-  end
-
-  local function keyreleased(_, _, key, _)
-    if key == "Shift_R" or key == "Shift_L" then
-      self.shift_active = false
-    end
-  end
-
   self.keygrabber = awful.keygrabber {
     stop_key = "Mod4",
     stop_event = "press",
     autostart = true,
-    keypressed_callback = keypressed,
-    keyreleased_callback = keyreleased,
+    keypressed_callback = self.keypressed,
+    keyreleased_callback = self.keyreleased,
   }
 end
 
 function Navigator:pause()
+  self.keygrabber:stop()
+end
+
+function Navigator:unpause()
+  self.keygrabber = awful.keygrabber {
+    stop_key = "Mod4",
+    stop_event = "press",
+    autostart = true,
+    keypressed_callback = self.keypressed,
+    keyreleased_callback = self.keyreleased,
+  }
 end
 
 function Navigator:stop()
