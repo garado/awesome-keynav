@@ -35,7 +35,8 @@ function Navigator:new(args)
   })
   o.curr_area   = nil
   o.keygrabber  = nil
-  o.rules       = args.rules or nil
+  o.modal       = args.modal or false
+  --o.rules       = args.rules or nil
   o.start_area  = nil
   o.start_index = 0
   o.last_key    = ""
@@ -86,11 +87,18 @@ end
 
 -- Set navigator area to a specific area
 function Navigator:set_area(target, start_area)
+  self:select_toggle()
+
   if target == "root" then
     self.curr_area = self.root
-    return
+  else
+    self:_set_area(target, start_area)
   end
 
+  self:select_toggle()
+end
+
+function Navigator:_set_area(target, start_area)
   local area = start_area or self.root
   for i = 1, #area.items do
     if area.items[i].is_area then
@@ -98,7 +106,7 @@ function Navigator:set_area(target, start_area)
         self.curr_area = area.items[i]
         return
       else
-        self:set_area(target, area.items[i])
+        self:_set_area(target, area.items[i])
       end
     end
   end
@@ -201,27 +209,6 @@ function Navigator:find_next_area(start_area, direction)
   end
 
   navprint("bounds are ".. bounds)
-
-  --local searching_start_area = self.start_area == area
-  --local at_edge = area.index == 1 or area.index == #area.items
-  --if searching_start_area and at_edge then
-  --  if area.index == 1 and left then area.index = #area.items end
-  --  if area.index == #area.items and right then area.index = 1 end
-  --end
-
-  -- edge case:
-  -- the start area's current index is visited,
-  -- and the current index is at an edge,
-  -- and the area is circular.
-  -- in this case force iterate to make the start area wrap around to the
-  -- next element, and then start our search from there.
-  --local index = start_area.index
-  --local at_edge = index == 1 or index == #start_area.items
-  ----local visited_current = start_area.items[index].visited
-  --if start_area.circular and at_edge then
-  --  print("IM FUCKING CIRCUALR")
-  --  start_area:iter(direction)
-  --end
 
   -- look through area's item table for next navitem to select
   for i = area.index, bounds, direction do
@@ -463,12 +450,38 @@ function Navigator:iter_col(key, default)
   end
 end
 
--- Functions for handling keypresses
--- Returns rule for a specific key
-function Navigator:get_rule(key)
-  local box_name = self.curr_area.name
-  if self.rules[box_name] and self.rules[box_name][key] then
-    return self.rules[box_name][key]
+--- Starting from the current area, recurse upward through areas and find the first
+-- instance of a keyrule for a given key. If found, execute the keyrule.
+-- @param key The key to search for.
+-- @param area The area to search. 
+-- @return The area in which the keyrule was found.
+function Navigator:check_keyrules_recurse_up(key, area)
+  if not area then return end
+  local keytable = area.keys
+  if keytable and keytable[key] then
+    local keyrule_type = type(keytable[key])
+    if keyrule_type == "function" then
+      keytable[key]()
+    elseif keyrule_type == "table" then
+      local keyrule_func = keytable[key]["function"]
+      local keyrule_args = keytable[key]["args"]
+      keyrule_func(keyrule_args)
+    end
+    return area
+  else
+    local parent = area.parent
+    if parent then
+      self:check_keyrules_recurse_up(key, parent)
+    end
+  end
+end
+
+function Navigator:jump_to_end(amount)
+  if amount == 1 then
+    local num_items = #self.curr_area.items
+    self.curr_area.index = num_items
+  elseif amount == -1 then
+    self.curr_area.index = 1
   end
 end
 
@@ -492,60 +505,10 @@ function Navigator:handle_key(type, amount)
     self:iter_col(type, amount)
   elseif type == "jump" then
     self:iter_between_areas(amount)
+  elseif type == "ends" then
+    self:jump_to_end(amount)
   else
     self:iter_within_area(amount)
-  end
-end
-
-function Navigator:keypressed(_, _, key, _)
-  navprint("keypressed: curr area is "..self.curr_area.name)
-  self.root:reset_visited_recursive()
-  self.last_area = self.curr_area
-  --self:check_curr_area_exists()
-  spaces = ""
-  if key ~= "Return" and key ~= "q"  then self:select_toggle() end
-
-  -- Shift + Tab should act as backspace
-  if key == "Shift_L" or key == "Shift_R" then
-    self.shift_active = true
-  end
-  if key == "Tab" and self.shift_active then key = "BackSpace" end
-
-  -- Determine the navigation type
-  local valid_types = {
-    ["vertical"] = true,
-    ["horizontal"] = true,
-    ["jump"] = true,
-    ["release"] = true,
-  }
-
-  local type = ""
-  if key == "j" or key == "k" then type = "vertical" end
-  if key == "h" or key == "l" then type = "horizontal" end
-  if key == "Tab" or key == "BackSpace" then type = "jump" end
-  if key == "Return" then type = "release" end
-
-  -- Determine if navigating left or right through the tree
-  local amt = 0
-  if key == "j" or key == "l" or key == "Tab" then amt = 1 end
-  if key == "h" or key == "k" or key == "BackSpace" then amt = -1 end
-
-  if valid_types[type] then self:handle_key(type, amt) end
-
-  if key == "q" then -- debug: print current hierarchy
-    self.root:dump()
-  end
-
-  if key ~= "Return" and key ~= "q" then self:select_toggle() end
-  self.last_key = "key"
-  if self.last_area ~= self.curr_area and self.last_area ~= "" then
-    awesome.emit_signal("nav::area_changed", self.last_area.name)
-  end
-end
-
-function Navigator:keyreleased(_, _, key, _)
-  if key == "Shift_R" or key == "Shift_L" then
-    self.shift_active = false
   end
 end
 
@@ -554,34 +517,94 @@ function Navigator:start()
   self:select_toggle()
   self.root:verify_nav_references()
 
+  local function keypressed(_, _, key, _)
+    navprint("keypressed ("..key.."): curr area is "..self.curr_area.name)
+    self.root:reset_visited_recursive()
+    self.last_area = self.curr_area
+
+    spaces = ""
+
+    -- Shift + Tab should act as backspace
+    if key == "Shift_L" or key == "Shift_R" then
+      self.shift_active = true
+    end
+    if key == "Tab" and self.shift_active then key = "BackSpace" end
+
+    -- Check if there are any custom keyrules functions
+    local found_keyrule = self:check_keyrules_recurse_up(key, self.curr_area)
+
+    if key ~= "Return" and key ~= "q"  then self:select_toggle() end
+
+    -- Determine the navigation type
+    local valid_types = {
+      ["vertical"] = true,
+      ["horizontal"] = true,
+      ["jump"] = true,
+      ["release"] = true,
+      ["ends"] = true, -- jump to ends of current area: gg/GG
+    }
+
+    local type = ""
+    if key == "j" or key == "k" then type = "vertical" end
+    if key == "h" or key == "l" then type = "horizontal" end
+    if key == "Tab" or key == "BackSpace" then type = "jump" end
+    if key == "Return" then type = "release" end
+    if key == "g" and self.last_key == "g" then type = "ends" end
+    if key == "G" then type = "ends" end
+
+    -- Determine if navigating left or right through the tree
+    local amt = 0
+    if key == "j" or key == "l" or key == "Tab" then amt = 1 end
+    if key == "h" or key == "k" or key == "BackSpace" then amt = -1 end
+    if type == "ends" and key == "g" then amt = -1 end
+    if type == "ends" and key == "G" then amt = 1 end
+
+    -- Call navigation functions if applicable
+    if valid_types[type] and not found_keyrule then
+      self:handle_key(type, amt)
+    else
+      navprint("no valid type")
+    end
+
+    -- Debug: print current nav hierarchy
+    if key == "q" then
+      self.root:dump()
+    end
+
+    if key ~= "Return" and key ~= "q" then self:select_toggle() end
+
+    if type == "ends" then
+      self.last_key = ""
+    else
+      self.last_key = key
+    end
+    if self.last_area ~= self.curr_area and self.last_area ~= "" then
+      awesome.emit_signal("nav::area_changed", self.last_area.name)
+    end
+  end
+
+  local function keyreleased(_, _, key, _)
+    if key == "Shift_R" or key == "Shift_L" then
+      self.shift_active = false
+    end
+  end
+
   self.keygrabber = awful.keygrabber {
     stop_key = "Mod4",
     stop_event = "press",
     autostart = true,
-    keypressed_callback = self.keypressed,
-    keyreleased_callback = self.keyreleased,
-  }
-end
-
-function Navigator:pause()
-  self.keygrabber:stop()
-end
-
-function Navigator:unpause()
-  self.keygrabber = awful.keygrabber {
-    stop_key = "Mod4",
-    stop_event = "press",
-    autostart = true,
-    keypressed_callback = self.keypressed,
-    keyreleased_callback = self.keyreleased,
+    keypressed_callback = keypressed,
+    keyreleased_callback = keyreleased,
+    stop_callback = function()
+      self.curr_area = self.root
+      self.root:reset()
+    end
   }
 end
 
 function Navigator:stop()
   awesome.emit_signal("nav::area_changed", "")
   self.root:select_off_recursive()
-  self.curr_area = self.root
-  self.root:reset()
   self.keygrabber:stop()
 end
 

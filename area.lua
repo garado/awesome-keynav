@@ -8,7 +8,7 @@
 local Area = {}
 function Area:new(args)
   local o = {}
-  o.name      = args.name or "unnamed"
+  o.name      = args.name or "unnamed_area"
   o.parent    = args.parent or nil
   o.items     = args.items or {}
   o.widget    = args.widget or nil
@@ -21,7 +21,9 @@ function Area:new(args)
   o.selected  = false
   o.visited   = false
   o.nav       = args.nav or nil
+  o.confine   = args.confine or false
   o.circular  = args.circular or false
+  o.keys      = args.keys or nil
   self.__index = self
   return setmetatable(o, self)
 end
@@ -38,7 +40,6 @@ function Area:append(item)
   if item.is_area then
     item.parent = self
     if self.nav then
-      print("appending nav to item "..item.name)
       item.nav = self.nav
     end
   end
@@ -83,7 +84,6 @@ end
 -- Remove a specific area from area's item table.
 function Area:remove_item(item)
   if self.nav then
-    print("Removing item "..item.name.." from "..self.name.." and notifying navigator")
     self.nav:emit_signal("nav::area_removed", self, item)
   end
   item:select_off_recursive()
@@ -107,6 +107,7 @@ function Area:remove_all_items()
   for i = 1, #self.items do
     table.remove(self.items, i)
   end
+  self.items = {} -- why does the loop not work but this does???
   self.index = 1
 end
 
@@ -225,7 +226,6 @@ end
 function Area:max_index_recursive()
   for i = 1, #self.items do
     if self.items[i].is_area then
-      print("area "..self.name.. " contains area children:maxing its index")
       self.index = #self.items
       self.items[i]:max_index_recursive()
     end
