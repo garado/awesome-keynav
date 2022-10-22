@@ -4,7 +4,6 @@
 
 local awful = require("awful")
 local gobject = require("gears.object")
-
 local path = (...):match("(.-)[^%.]+$")
 
 -- For printing stacktrace
@@ -36,7 +35,6 @@ function Navigator:new(args)
   o.curr_area   = nil
   o.keygrabber  = nil
   o.modal       = args.modal or false
-  --o.rules       = args.rules or nil
   o.start_area  = nil
   o.start_index = 0
   o.last_key    = ""
@@ -69,23 +67,29 @@ function Navigator:release()
 end
 
 -- Helper functions because access syntax is gross
+
+--- Return current area's parent.
 function Navigator:parent()
   if self.curr_area then
     return self.curr_area.parent
   end
 end
 
+--- Return the current item within the current area.
 function Navigator:curr_item()
   if self.curr_area then
     return self.curr_area:get_curr_item()
   end
 end
 
+--- Return the current area's name.
 function Navigator:name()
   return self.curr_area.name
 end
 
--- Set navigator area to a specific area
+--- Set navigator area to a specific area.
+-- @param target The name of the area the navigator should be set to.
+-- @param start_area i think i can refactor and remove this
 function Navigator:set_area(target, start_area)
   self:select_toggle()
 
@@ -456,6 +460,7 @@ end
 -- @param area The area to search. 
 -- @return The area in which the keyrule was found.
 function Navigator:check_keyrules_recurse_up(key, area)
+  navprint("check_keyrules_recurse_up::entering")
   if not area then return end
   local keytable = area.keys
   if keytable and keytable[key] then
@@ -563,7 +568,7 @@ function Navigator:start()
     if valid_types[type] and not found_keyrule then
       self:handle_key(type, amt)
     else
-      navprint("no valid type")
+      navprint("navigate: no valid handlekey type found")
     end
 
     -- Debug: print current nav hierarchy
