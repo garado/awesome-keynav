@@ -297,6 +297,8 @@ function Navigator:iter_between_areas(val)
   set_spaces()
 
   --self:check_curr_area_exists()
+  if not self.curr_area then return end
+  if #self.curr_area.items == 0 then return end
 
   -- check if parent exists
   if not self:parent() then
@@ -338,6 +340,7 @@ function Navigator:iter_within_area(val)
 
   --self:check_curr_area_exists()
 
+  if not self.curr_area then return end
   local area = self.curr_area
   local curr_item = self.curr_area:get_curr_item()
 
