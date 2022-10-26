@@ -79,7 +79,7 @@ The underlying keynav structure here looks like this
 - Pressing enter "clicks" the button
 - Pressing (shift+)tab cycles between areas
 
-- Areas can be laid out in a grid
+- Navitems in an area can be laid out in a grid
   - The habit widget is laid out in a grid formation with each habit having its own area
   - There, I prefer hjkl to move up, down, left, right through items in the grid
   - I also prefer that tab ignores subareas in the grid (exercise, read, etc) so it doesn't cycle between them
@@ -130,6 +130,23 @@ The underlying keynav structure here looks like this
 - Pressing G/gg jumps to top/bottom
 
 ## Control center
+The underlying keynav structure here looks like this
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                             NAV_ROOT                                 │
+│                                                                      │
+│  ┌────────────────┐  ┌────────────────────┐   ┌────────────────────┐ │
+│  │ NAV_ANIMATIONS │  │ NAV_QUICK_ACTIONS  │   │     NAV_POWER      │ │
+│  │    - fast      │  │ - quick action 1   │   │  - power option 1  │ │
+│  │    - fancy     │  │ - quick action 2   │   │  - power option 2  │ │
+│  │    - off       │  │ - etc              │   └────────────────────┘ │
+│  └────────────────┘  └────────────────────┘   ┌────────────────────┐ │
+│                                               │ NAV_POWER_CONFIRM  │ │
+│                                               │       - yes        │ │
+│                                               │       - no         │ │
+│                                               └────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────┘
+```
 (todo)
 
 ## Theme switcher
