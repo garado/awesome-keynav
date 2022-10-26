@@ -108,7 +108,7 @@ end
 
 ## Task manager
 The underlying keynav structure here looks like this
-
+```
 ┌─────────────────────────────────────────────────────────────┐
 │                        NAV_ROOT                             │
 │    ┌────────────┐  ┌─────────────────┐   ┌───────────────┐  │
@@ -119,6 +119,7 @@ The underlying keynav structure here looks like this
 │    │  - etc     │  │                 │   │               │  │
 │    └────────────┘  └─────────────────┘   └───────────────┘  │
 └─────────────────────────────────────────────────────────────┘
+```
 
 - Areas can have "container" widgets attached to them
   - These widgets only have the `select_on` and `select_off` functions defined
