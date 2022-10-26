@@ -1,6 +1,8 @@
+```
 ░█▀▄░█▀▀░█▀█░█▀▄░█▄█░█▀▀
 ░█▀▄░█▀▀░█▀█░█░█░█░█░█▀▀
 ░▀░▀░▀▀▀░▀░▀░▀▀░░▀░▀░▀▀▀
+```
 
 # ⌨️ Keynav
 I like AwesomeWM a lot and spend a lot of time making widgets. I also like Vim a lot and prefer to control everything with the keyboard. I was annoyed with having to use my mouse to use my widgets so I wrote this library to enable keyboard navigation within widgets.
@@ -48,7 +50,7 @@ end)
 (put picture of dashboard here)
 
 The underlying keynav structure here looks like this
-
+```
 ┌────────────────────────────────────────────────────┐
 │                     NAV_ROOT                       │
 │                                                    │
@@ -72,7 +74,7 @@ The underlying keynav structure here looks like this
 │                          │     other habits      │ │
 │                          └───────────────────────┘ │
 └────────────────────────────────────────────────────┘
-
+```
 - Pressing hjkl moves between navitems in an area
 - Pressing enter "clicks" the button
 - Pressing (shift+)tab cycles between areas
