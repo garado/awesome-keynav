@@ -162,11 +162,11 @@ end
 local Task = Base:new(...)
 
 function Task:select_on()
-  self.custom_obj:emit_signal("tasks::task_selected")
-  self.selected = true
   local text = self.widget.children[1]
-  self.custom_obj.current_task = text.markup
-  self.custom_obj.id = self.name
+  self.selected = true
+  self.custom_obj:emit_signal("tasks::task_selected")
+  self.custom_obj.current_task = remove_pango(text.markup)
+  self.custom_obj.current_id = self.name
   text.font = beautiful.font_name .. "Bold 12"
 end
 

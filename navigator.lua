@@ -91,7 +91,7 @@ end
 -- @param target The name of the area the navigator should be set to.
 -- @param start_area i think i can refactor and remove this
 function Navigator:set_area(target, start_area)
-  self:select_toggle()
+  self.curr_area:select_off_recursive()
 
   if target == "root" then
     self.curr_area = self.root
@@ -99,7 +99,8 @@ function Navigator:set_area(target, start_area)
     self:_set_area(target, start_area)
   end
 
-  self:select_toggle()
+  self.curr_area:select_on_recurse_up()
+  --self.curr_area:select_toggle_recurse_up()
 end
 
 function Navigator:_set_area(target, start_area)
@@ -107,6 +108,7 @@ function Navigator:_set_area(target, start_area)
   for i = 1, #area.items do
     if area.items[i].is_area then
       if area.items[i].name == target then
+        self.curr_area:select_off_recursive()
         self.curr_area = area.items[i]
         return
       else
@@ -341,6 +343,8 @@ function Navigator:iter_within_area(val)
   --self:check_curr_area_exists()
 
   if not self.curr_area then return end
+  if #self.curr_area.items == 0 then return end
+
   local area = self.curr_area
   local curr_item = self.curr_area:get_curr_item()
 
@@ -521,7 +525,9 @@ function Navigator:handle_key(type, amount)
 end
 
 function Navigator:start()
-  self.curr_area = self.root
+  if not self.curr_area then
+    self.curr_area = self.root
+  end
   self:select_toggle()
   self.root:verify_nav_references()
 
@@ -541,7 +547,10 @@ function Navigator:start()
     -- Check if there are any custom keyrules functions
     local found_keyrule = self:check_keyrules_recurse_up(key, self.curr_area)
 
-    if key ~= "Return" and key ~= "q"  then self:select_toggle() end
+    if key ~= "Return" and key ~= "q" then
+      self.curr_area:select_off_recursive()
+      -- self:select_toggle()
+    end
 
     -- Determine the navigation type
     local valid_types = {
@@ -576,17 +585,24 @@ function Navigator:start()
 
     -- Debug: print current nav hierarchy
     if key == "q" then
+      print("\nDUMP: Current pos is "..self.curr_area.name.."("..self.curr_area.index..")")
       self.root:dump()
     end
 
-    if key ~= "Return" and key ~= "q" then self:select_toggle() end
-
-    if type == "ends" then
-      self.last_key = ""
-    else
-      self.last_key = key
+    if key ~= "Return" and key ~= "q" then
+      self.curr_area:select_on_recurse_up()
+      -- self:select_toggle()
     end
-    if self.last_area ~= self.curr_area and self.last_area ~= "" then
+
+    self.last_key = (type == "ends" and "") or key
+
+    local area_changed = self.last_area ~= self.curr_area and self.last_area ~= ""
+    local hl_persist = area_changed and self.last_area.hl_persist_on_area_switch
+    if hl_persist then
+      self.last_area.items[self.last_area.index]:select_on()
+    end
+
+    if area_changed then
       awesome.emit_signal("nav::area_changed", self.last_area.name)
     end
   end
@@ -612,8 +628,10 @@ end
 
 function Navigator:stop()
   awesome.emit_signal("nav::area_changed", "")
-  self.root:select_off_recursive()
-  self.keygrabber:stop()
+  --self.root:select_off_recursive()
+  if self.keygrabber then
+    self.keygrabber:stop()
+  end
 end
 
 return Navigator

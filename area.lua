@@ -17,13 +17,20 @@ function Area:new(args)
   o.is_navitem = false
   o.is_row    = args.is_row or false
   o.is_column = args.is_column or false
-  o.is_grid_container = args.is_grid_container or false
   o.selected  = false
   o.visited   = false
   o.nav       = args.nav or nil
   o.confine   = args.confine or false
   o.circular  = args.circular or false
   o.keys      = args.keys or nil
+
+  -- If the area contains a grid of navitems. Needed because grid navigation has a very
+  -- specific algorithm.
+  o.is_grid_container = args.is_grid_container or false
+
+  -- If the current item highlight should persist when switching to another area.
+  o.hl_persist_on_area_switch = args.hl_persist_on_area_switch or false
+
   self.__index = self
   return setmetatable(o, self)
 end
@@ -62,6 +69,14 @@ end
 -- Return the currently selected item within the item table.
 function Area:get_curr_item()
   return self.items[self.index]
+end
+
+function Area:set_curr_item(idx)
+  if idx > 0 and idx <= #self.items then
+    self.items[self.index]:select_off()
+    self.index = idx
+    self.items[self.index]:select_on()
+  end
 end
 
 function Area:is_empty() return #self.items == 0 end
@@ -154,6 +169,22 @@ end
 
 -- You should not be able to directly interact with the area widget
 function Area:release() end
+
+function Area:select_on_recurse_up()
+  -- Set self and current item
+  self.selected = not self.selected
+  if self.items[self.index] and self.items[self.index].is_navitem then
+    self.items[self.index]:select_on()
+  end
+
+  -- Toggle area widgets
+  if self.widget then self.widget:select_on() end
+
+  -- Recurse up through the navtree
+  if self.parent then
+    self.parent:select_on_recurse_up()
+  end
+end
 
 -- Toggle selection for the current item and also all areas within
 -- the branch.
@@ -275,7 +306,7 @@ end
 
 -- Print area contents.
 function Area:dump()
-  print("\nDUMP: Current pos is "..self.name.."("..self.index..")")
+  --print("\nDUMP: Current pos is "..self.name.."("..self.index..")")
   self:_dump()
 end
 
