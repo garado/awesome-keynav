@@ -1,20 +1,20 @@
 
--- █▄░█ ▄▀█ █░█ █ ▀█▀ █▀▀ █▀▄▀█ 
--- █░▀█ █▀█ ▀▄▀ █ ░█░ ██▄ █░▀░█ 
+-- █▄░█ ▄▀█ █░█ █ ▀█▀ █▀▀ █▀▄▀█ █▀ 
+-- █░▀█ █▀█ ▀▄▀ █ ░█░ ██▄ █░▀░█ ▄█ 
 
--- Class definitions for making widgets navigable
--- with the keyboard
+-- Default class definitions for keyboard-navigable widgets
 
-local beautiful = require("beautiful")
-local colorize = require("helpers.ui").colorize_text
-local remove_pango = require("helpers.dash").remove_pango
+local gtable        = require("gears.table")
+local beautiful     = require("beautiful")
+local colorize      = require("helpers.ui").colorize_text
+local remove_pango  = require("helpers.dash").remove_pango
 
 -- █▄▄ ▄▀█ █▀ █▀▀ 
 -- █▄█ █▀█ ▄█ ██▄ 
 -- Only responsible for defining basic vars
 -- Functions must be overridden in derived classes
+-- TODO: remove custom_obj!
 local Base = {}
---function Base:new(widget, custom_obj, name)
 function Base:new(widget, custom_obj, name)
   local o = {}
   o.widget      = widget
@@ -44,6 +44,7 @@ end
 
 -- █▀▀ █░░ █▀▀ █░█ ▄▀█ ▀█▀ █▀▀ █▀▄ 
 -- ██▄ █▄▄ ██▄ ▀▄▀ █▀█ ░█░ ██▄ █▄▀ 
+
 local Elevated = Base:new(...)
 
 function Elevated:select_on()
@@ -59,6 +60,51 @@ end
 function Elevated:release()
   self.widget:nav_release()
 end
+
+
+-- ▀█▀ █▀▀ ▀▄▀ ▀█▀ █▄▄ █▀█ ▀▄▀ 
+-- ░█░ ██▄ █░█ ░█░ █▄█ █▄█ █░█ 
+
+local Textbox = Base:new(...)
+
+function Textbox:select_on()
+  self.selected = true
+  local text = remove_pango(self.widget.markup)
+  local markup = colorize(text, self.fg_on or beautiful.main_accent)
+  self.widget:set_markup_silently(markup)
+  if self.custom_on then self:custom_on() end
+end
+
+function Textbox:select_off()
+  self.selected = false
+  local text = remove_pango(self.widget.markup)
+  local markup = colorize(text, self.fg_off or beautiful.fg)
+  self.widget:set_markup_silently(markup)
+  if self.custom_off then self:custom_off() end
+end
+
+function Textbox:release() end
+
+
+-- █▄▄ ▄▀█ █▀▀ █▄▀ █▀▀ █▀█ █▀█ █░█ █▄░█ █▀▄ 
+-- █▄█ █▀█ █▄▄ █░█ █▄█ █▀▄ █▄█ █▄█ █░▀█ █▄▀ 
+
+local Background = Base:new(...)
+
+function Background:select_on()
+  self.selected = true
+  self.widget.bg = self.bg_on or beautiful.dash_widget_sel
+end
+
+function Background:select_off()
+  self.selected = false
+  self.widget.bg = self.bg_off or beautiful.dash_widget_bg
+end
+
+function Background:release() end
+
+-- EVERYTHING BELOW HERE NEEDS TO BE REFACTORED/REMOVED
+---------------------
 
 -- █▀█ ▄▀█ █▀▀ ▀█▀ █ █▀█ █▄░█ 
 -- ▀▀█ █▀█ █▄▄ ░█░ █ █▄█ █░▀█ 
@@ -164,9 +210,6 @@ local Task = Base:new(...)
 function Task:select_on()
   local text = self.widget.children[1]
   self.selected = true
-  self.custom_obj:emit_signal("tasks::task_selected")
-  self.custom_obj.current_task = remove_pango(text.markup)
-  self.custom_obj.current_id = self.name
   text.font = beautiful.font_name .. "Bold 12"
 end
 
@@ -230,15 +273,20 @@ end
 
 function Tasks_Textbox:release() end
 
+-- TODO: possibly Rename to Nav_everything
 return {
-  Elevated = Elevated,
+  Base        = Base,
+  Elevated    = Elevated,
+  Textbox     = Textbox,
+  Background  = Background,
+  --- 
   Qaction = Qaction,
   Habit = Habit,
   Dashtab = Dashtab,
   Dashwidget = Dashwidget,
   Project = Project,
   Task = Task,
-  Taskbox = Taskbox,
-  Tasks_Textbox = Tasks_Textbox,
+  -- Taskbox = Taskbox,
+  -- Tasks_Textbox = Tasks_Textbox,
   OverviewBox = OverviewBox,
 }

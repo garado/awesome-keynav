@@ -20,7 +20,7 @@ Navitems are grouped into areas
 
 The navigator controls moving through areas
 
-Every widget must have a root area
+Every widget has a root area
   - You don't interact with the root area; it just acts as a container for other areas
   - Other areas must be appended to root (`nav_root:append(your_area_name)`)
 

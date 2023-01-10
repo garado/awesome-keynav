@@ -2,9 +2,9 @@
 -- █▄░█ ▄▀█ █░█ █ █▀▀ ▄▀█ ▀█▀ █▀█ █▀█ 
 -- █░▀█ █▀█ ▀▄▀ █ █▄█ █▀█ ░█░ █▄█ █▀▄ 
 
-local awful = require("awful")
+local awful   = require("awful")
 local gobject = require("gears.object")
-local path = (...):match("(.-)[^%.]+$")
+local path    = (...):match("(.-)[^%.]+$")
 
 -- For printing stacktrace
 local debug_mode = false
@@ -471,13 +471,8 @@ function Navigator:check_keyrules_recurse_up(key, area)
   if not area then return end
   local keytable = area.keys
   if keytable and keytable[key] then
-    local keyrule_type = type(keytable[key])
-    if keyrule_type == "function" then
-      keytable[key]()
-    elseif keyrule_type == "table" then
-      local keyrule_func = keytable[key]["function"]
-      local keyrule_args = keytable[key]["args"]
-      keyrule_func(keyrule_args)
+    if type(keytable[key]) == "table" then
+      if keytable[key].f then keytable[key].f() end
     end
     return area
   else
@@ -508,17 +503,33 @@ function Navigator:handle_key(type, amount)
   self.start_area   = self.curr_area
   self.start_index  = self.curr_area.index
 
-  -- Order matters here!
+  local c_area = self.curr_area
+
   if type == "release" then
     self:release()
-  elseif self.curr_area.is_row then
+  elseif c_area.is_row then
     self:iter_row(type, amount)
-  elseif self.curr_area.is_col then
+  elseif c_area.is_col then
     self:iter_col(type, amount)
   elseif type == "jump" then
     self:iter_between_areas(amount)
   elseif type == "ends" then
     self:jump_to_end(amount)
+  elseif c_area.is_grid then -- TODO uggghhh this is so screwy
+    if type == "vertical" then
+      -- If you are at the first or last row, wrap around
+      local iter_amt = c_area.grid_cols * amount
+      local next_index = c_area.index + iter_amt
+      if next_index > #c_area.items then
+        c_area.index = c_area.index % c_area.grid_cols
+        if c_area.index == 0 then c_area.index = 7 end
+      elseif next_index < 0 then
+      else
+        self:iter_within_area(iter_amt)
+      end
+    elseif type == "horizontal" then
+      self:iter_within_area(amount)
+    end
   else
     self:iter_within_area(amount)
   end

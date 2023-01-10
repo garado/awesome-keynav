@@ -24,8 +24,13 @@ function Area:new(args)
   o.circular  = args.circular or false
   o.keys      = args.keys or nil
 
+  o.is_grid   = args.is_grid or nil
+  o.grid_rows = args.grid_rows or nil
+  o.grid_cols = args.grid_cols or nil
+
   -- If the area contains a grid of navitems. Needed because grid navigation has a very
   -- specific algorithm.
+  -- TODO fix the dumbass algorithm
   o.is_grid_container = args.is_grid_container or false
 
   -- If the current item highlight should persist when switching to another area.
@@ -37,10 +42,13 @@ end
 
 -- ▄▀█ █▀▀ █▀▀ █▀▀ █▀ █▀    █▀▀ █░█ █▄░█ █▀▀ ▀█▀ █ █▀█ █▄░█ █▀ 
 -- █▀█ █▄▄ █▄▄ ██▄ ▄█ ▄█    █▀░ █▄█ █░▀█ █▄▄ ░█░ █ █▄█ █░▀█ ▄█ 
--- Override equality operator to check if 2 boxes are equal.
+--- Override equality operator to check if 2 areas are equal.
+-- @param b The area to check equality against.
 function Area:__eq(b)
   return self.name == b.name
 end
+
+function Area:is_empty() return #self.items == 0 end
 
 -- Append item to area's item table.
 function Area:append(item)
@@ -67,21 +75,40 @@ function Area:contains(item)
 end
 
 -- Return the currently selected item within the item table.
+-- TODO: Replace with get_focused_item
 function Area:get_curr_item()
   return self.items[self.index]
 end
 
+function Area:get_focused_item()
+  return self.items[self.index]
+end
+
+-- TODO: Replace with set_curr_item
+--- Set focused item to the item at the given index.
+-- @param idx Index to set
 function Area:set_curr_item(idx)
   if idx > 0 and idx <= #self.items then
-    self.items[self.index]:select_off()
+    if self.items[self.index] then
+      self.items[self.index]:select_off()
+    end
     self.index = idx
     self.items[self.index]:select_on()
   end
 end
 
-function Area:is_empty() return #self.items == 0 end
+-- function Area:set_focused_item(idx)
+--   if idx > 0 and idx <= #self.items then
+--     if self.items[self.index] then
+--       self.items[self.index]:select_off()
+--     end
+--     self.index = idx
+--     self.items[self.index]:select_on()
+--   end
+-- end
 
--- Remove an item from a given index in the item table.
+--- Remove an item from a given index in the item table.
+-- @index Index of item to remove.
 function Area:remove_index(index)
   local item = self.items[index]
   if item then
@@ -96,7 +123,7 @@ function Area:remove_index(index)
 end
 
 
--- Remove a specific area from area's item table.
+-- Remove an area with a specific name from area's item table.
 function Area:remove_item(item)
   if self.nav then
     self.nav:emit_signal("nav::area_removed", self, item)
