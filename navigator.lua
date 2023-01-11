@@ -21,33 +21,45 @@ end
 
 ---
 
--- Class definition
 local Navigator = {}
+Navigator.__index = Navigator
+
+setmetatable(Navigator, {
+  __call = function(class, ...)
+    return class:new(...)
+  end
+})
+
 function Navigator:new(args)
   args = args or {}
+  self = setmetatable(gobject{}, Navigator)
 
-  local o = gobject{}
-  o.root  = require(path .. "area"):new({
-    name = "root",
+  self.root  = require(path .. "area")({
+    name     = "root",
     circular = true,
-    nav = o,
+    nav      = self,
+    keys     = args.root_keys or nil
   })
-  o.curr_area   = nil
-  o.keygrabber  = nil
-  o.modal       = args.modal or false
-  o.start_area  = nil
-  o.start_index = 0
-  o.last_key    = ""
-  o.last_area   = ""
-  o.shift_active = false
+  self.modal       = args.modal or false
+  self.curr_area   = nil
+  self.keygrabber  = nil
+  self.start_area  = nil
+  self.start_index = 0
+  self.last_key    = ""
+  self.last_area   = ""
+  self.shift_active = false
 
-  o:connect_signal("nav::area_removed", function(navigator, parent, removed_area)
+  args.root_children = args.root_children or {}
+  for i = 1, #args.root_children do
+    self.root:append(args.root_children[i])
+  end
+
+  self:connect_signal("nav::area_removed", function(navigator, parent, removed_area)
     navprint("Caught remove area signal for "..removed_area.name.." from "..parent.name)
     self:handle_removed_area(navigator, parent, removed_area)
   end)
 
-  self.__index = self
-  return setmetatable(o, self), o.root
+  return self, self.root
 end
 
 -- Action functions
@@ -473,6 +485,8 @@ function Navigator:check_keyrules_recurse_up(key, area)
   if keytable and keytable[key] then
     if type(keytable[key]) == "table" then
       if keytable[key].f then keytable[key].f() end
+    elseif type(keytable[key]) == "function" then
+      keytable[key]()
     end
     return area
   else

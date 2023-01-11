@@ -6,42 +6,56 @@
 -- Very messy right now and needs more documentation (but it works!)
 
 local Area = {}
-function Area:new(args)
-  local o = {}
-  o.name      = args.name or "unnamed_area"
-  o.parent    = args.parent or nil
-  o.items     = args.items or {}
-  o.widget    = args.widget or nil
-  o.index     = 1
-  o.is_area   = true
-  o.is_navitem = false
-  o.is_row    = args.is_row or false
-  o.is_column = args.is_column or false
-  o.selected  = false
-  o.visited   = false
-  o.nav       = args.nav or nil
-  o.confine   = args.confine or false
-  o.circular  = args.circular or false
-  o.keys      = args.keys or nil
+Area.__index = Area
 
-  o.is_grid   = args.is_grid or nil
-  o.grid_rows = args.grid_rows or nil
-  o.grid_cols = args.grid_cols or nil
+setmetatable(Area, {
+  __call = function(class, ...)
+    return class:new(...)
+  end
+})
+
+function Area:new(args)
+  self = setmetatable({}, Area)
+
+  self.name      = args.name or "unnamed_area"
+  self.parent    = args.parent or nil
+  self.items     = args.items or {}
+  self.widget    = args.widget or nil
+  self.index     = 1
+  self.is_area   = true
+  self.is_navitem = false
+  self.is_row    = args.is_row or false
+  self.is_column = args.is_column or false
+  self.selected  = false
+  self.visited   = false
+  self.nav       = args.nav or nil
+  self.confine   = args.confine or false
+  self.circular  = args.circular or false
+  self.keys      = args.keys or nil
+
+  self.is_grid   = args.is_grid or nil
+  self.grid_rows = args.grid_rows or nil
+  self.grid_cols = args.grid_cols or nil
 
   -- If the area contains a grid of navitems. Needed because grid navigation has a very
   -- specific algorithm.
   -- TODO fix the dumbass algorithm
-  o.is_grid_container = args.is_grid_container or false
+  self.is_grid_container = args.is_grid_container or false
 
   -- If the current item highlight should persist when switching to another area.
-  o.hl_persist_on_area_switch = args.hl_persist_on_area_switch or false
+  self.hl_persist_on_area_switch = args.hl_persist_on_area_switch or false
 
-  self.__index = self
-  return setmetatable(o, self)
+  args.children = args.children or {}
+  for i = 1, #args.children do
+    self:append(args.children[i])
+  end
+
+  return self
 end
 
 -- ▄▀█ █▀▀ █▀▀ █▀▀ █▀ █▀    █▀▀ █░█ █▄░█ █▀▀ ▀█▀ █ █▀█ █▄░█ █▀ 
 -- █▀█ █▄▄ █▄▄ ██▄ ▄█ ▄█    █▀░ █▄█ █░▀█ █▄▄ ░█░ █ █▄█ █░▀█ ▄█ 
+
 --- Override equality operator to check if 2 areas are equal.
 -- @param b The area to check equality against.
 function Area:__eq(b)

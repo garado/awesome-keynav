@@ -4,8 +4,9 @@
 ░▀░▀░▀▀▀░▀░▀░▀▀░░▀░▀░▀▀▀
 ```
 
-# ⌨️ Keynav
-I like AwesomeWM a lot and spend a lot of time making widgets. I also like Vim a lot and prefer to control everything with the keyboard. I was annoyed with having to use my mouse to use my widgets so I wrote this library to enable keyboard navigation within widgets.
+# ⌨️ Keyboard navigation for AwesomeWM widgets
+
+This library provides support for keyboard navigation within widgets. I hope fellow Vim enthusiasts find it useful.  
 
 Documentation is a little sparse right now but I'll update when I can and as best as I can.
 
@@ -27,7 +28,7 @@ Every widget has a root area
 ```
 -- Initializing the navigator
 local navigator = require("modules.keynav").navigator
-local navigator, nav_root = navigator:new()
+local navigator, nav_root = navigator()
 ```
 
 To start/stop the navigator, call `navigator:start()` and `navigator:stop()`
@@ -46,8 +47,8 @@ end)
 ```
 
 # Examples
-## Dashboard
-(put picture of dashboard here)
+## Dashboard: main tab
+![Dashboard](./assets/dashboard.png)
 
 The underlying keynav structure here looks like this
 ```
@@ -79,31 +80,17 @@ The underlying keynav structure here looks like this
 - Pressing enter "clicks" the button
 - Pressing (shift+)tab cycles between areas
 
-- Navitems in an area can be laid out in a grid
-  - The habit widget is laid out in a grid formation with each habit having its own area
-  - There, I prefer hjkl to move up, down, left, right through items in the grid
-  - I also prefer that tab ignores subareas in the grid (exercise, read, etc) so it doesn't cycle between them
+- Navitems in an area can be laid out in a grid (see habit widget)
 
-To replicate this, just set a few flags when initializing the areas:
+To replicate this, just set a few flags when initializing the area:
+
 ```
--- Init the area containing all of the habit sub-areas
-local nav_dash_habits = Area:new({
-  name = "nav_dash_habits",
-  circular = true,
-  is_grid_container = true,
+local nav_dash_habits = area({
+  name    = "nav_dash_habits",
+  is_grid = true,
+  grid_rows = 5,
+  grid_cols = 4,
 })
-
-...
-
-for i = 1, #habit_list do
-  local nav_habit = Area:new({
-    name = habit_list[i],
-    circular = true,
-    is_row = true,
-    row_wrap_vertical = true,
-  })
-  nav_dash_habits:append(nav_habit)
-end
 ```
 
 ## Task manager
@@ -123,9 +110,9 @@ The underlying keynav structure here looks like this
 
 - Areas can have "container" widgets attached to them
   - These widgets only have the `select_on` and `select_off` functions defined
-  - Example: the tags, projects, and tasklist areas have the wibox_background widget set as the container widget
-    - When navigating within the area, you can see the container widget highlights
-    - When outside the area, the container widget unhighlights
+  - Example: the tags, projects, and tasklist areas have wibox.container.background set as the container widget
+    - When entering the area, the container widget highlights
+    - When leaving the area, the container widget unhighlights
   
 - Pressing G/gg jumps to top/bottom
 
@@ -154,5 +141,5 @@ The underlying keynav structure here looks like this
 
 # Debugging
 - Use Xephyr to test your config in a sandbox
-- Open whatever widget you're testing
-- Press `q` to print the keynav hierarchy
+- Open whatever widget you're testing, then press `q` to print the keynav hierarchy
+
