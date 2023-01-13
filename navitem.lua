@@ -30,8 +30,6 @@ setmetatable(Base, {
   end,
 })
 
------- DEFAULT NAVITEMS --------
-
 -- ▀█▀ █▀▀ ▀▄▀ ▀█▀ █▄▄ █▀█ ▀▄▀ 
 -- ░█░ ██▄ █░█ ░█░ █▄█ █▄█ █░█ 
 
@@ -65,11 +63,6 @@ function Textbox:release() end
 -- █▄█ █▀█ █▄▄ █░█ █▄█ █▀▄ █▄█ █▄█ █░▀█ █▄▀ 
 
 local Background = {}
-setmetatable(Background, {
-  __call  = function (cls, ...)
-    return base(cls, ...)
-  end,
-})
 
 function Background:select_on()
   self.selected = true
@@ -83,8 +76,11 @@ function Background:select_off()
   if self.custom_off then self:custom_off() end
 end
 
-function Background:release() end
-
+setmetatable(Background, {
+  __call  = function (cls, ...)
+    return base(cls, ...)
+  end,
+})
 
 -- █▀▀ █░█ █▀▀ █▀▀ █▄▀ █▄▄ █▀█ ▀▄▀ 
 -- █▄▄ █▀█ ██▄ █▄▄ █░█ █▄█ █▄█ █░█ 
@@ -115,8 +111,46 @@ function Checkbox:release()
 end
 
 
--- █▀▀ █░░ █▀▀ █░█ ▄▀█ ▀█▀ █▀▀ █▀▄ 
--- ██▄ █▄▄ ██▄ ▀▄▀ █▀█ ░█░ ██▄ █▄▀ 
+-- █▀ █ █▀▄▀█ █▀█ █░░ █▀▀    █▄▄ █░█ ▀█▀ ▀█▀ █▀█ █▄░█ 
+-- ▄█ █ █░▀░█ █▀▀ █▄▄ ██▄    █▄█ █▄█ ░█░ ░█░ █▄█ █░▀█ 
+
+local SimpleButton = {}
+setmetatable(SimpleButton, {
+  __call = function (cls, ...)
+    return base(cls, ...)
+  end,
+})
+
+function SimpleButton:select_on()
+  self.selected = true
+  self.widget.bg = self.bg_off or beautiful.dash_widget_bg
+
+  local textbox = self.widget:get_children_by_id("textbox")[1]
+  local text = remove_pango(textbox.markup or "")
+  local color = self.fg_on or beautiful.main_accent or "#bf616a"
+  textbox:set_markup_silently(colorize(text, color))
+  if self.custom_on then self:custom_on() end
+end
+
+function SimpleButton:select_off()
+  self.selected = false
+  self.widget.bg = self.bg_off or beautiful.dash_widget_bg
+
+  local textbox = self.widget:get_children_by_id("textbox")[1]
+  local text = remove_pango(textbox.markup or "")
+  local color = self.fg_off or beautiful.fg or "#eceff4"
+  textbox:set_markup_silently(colorize(text, color))
+
+  if self.custom_off then self:custom_off() end
+end
+
+function SimpleButton:release()
+  self.widget:nav_release()
+end
+
+
+-- █▀▀ █▄▄ █░█ ▀█▀ ▀█▀ █▀█ █▄░█ 
+-- ██▄ █▄█ █▄█ ░█░ ░█░ █▄█ █░▀█ 
 
 local Elevated = {}
 setmetatable(Elevated, {
@@ -145,4 +179,5 @@ return {
   Background  = Background,
   Checkbox    = Checkbox,
   Elevated    = Elevated,
+  SimpleButton = SimpleButton,
 }
