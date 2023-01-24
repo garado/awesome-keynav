@@ -40,7 +40,7 @@ function Navigator:new(args)
     nav      = self,
     keys     = args.root_keys or nil
   })
-  self.modal       = args.modal or false
+  self.modal       = args.modal or false -- ???
   self.curr_area   = nil
   self.keygrabber  = nil
   self.start_area  = nil
@@ -48,6 +48,7 @@ function Navigator:new(args)
   self.last_key    = ""
   self.last_area   = ""
   self.shift_active = false
+  self.connect_signals = args.connect_signals
 
   args.root_children = args.root_children or {}
   for i = 1, #args.root_children do
@@ -73,7 +74,7 @@ end
 function Navigator:release()
   navprint("::release")
   local item = self:curr_item()
-  if item and not item.is_area then
+  if item and not item.is_area and item.release then
     item:release()
   end
 end
@@ -484,9 +485,11 @@ function Navigator:check_keyrules_recurse_up(key, area)
   local keytable = area.keys
   if keytable and keytable[key] then
     if type(keytable[key]) == "table" then
-      if keytable[key].f then keytable[key].f() end
+      if keytable[key].f then
+        return keytable[key].f()
+      end
     elseif type(keytable[key]) == "function" then
-      keytable[key]()
+      return keytable[key]()
     end
     return area
   else
@@ -621,14 +624,18 @@ function Navigator:start()
 
     self.last_key = (type == "ends" and "") or key
 
-    local area_changed = self.last_area ~= self.curr_area and self.last_area ~= ""
+    local area_changed = (self.last_area ~= self.curr_area) and self.last_area ~= ""
     local hl_persist = area_changed and self.last_area.hl_persist_on_area_switch
     if hl_persist then
       self.last_area.items[self.last_area.index]:select_on()
     end
 
+    -- TODO: remove signal, replace with function
     if area_changed then
       awesome.emit_signal("nav::area_changed", self.last_area.name)
+      if self.last_area.on_area_changed then
+        self.last_area:on_area_changed()
+      end
     end
   end
 
@@ -646,7 +653,7 @@ function Navigator:start()
     keyreleased_callback = keyreleased,
     stop_callback = function()
       self.curr_area = self.root
-      self.root:reset()
+      self.root:soft_reset()
     end
   }
 end

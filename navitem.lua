@@ -56,9 +56,6 @@ function Textbox:select_off()
   if self.custom_off then self:custom_off() end
 end
 
-function Textbox:release() end
-
-
 -- █▄▄ ▄▀█ █▀▀ █▄▀ █▀▀ █▀█ █▀█ █░█ █▄░█ █▀▄ 
 -- █▄█ █▀█ █▄▄ █░█ █▄█ █▀▄ █▄█ █▄█ █░▀█ █▄▀ 
 
@@ -180,4 +177,11 @@ return {
   Checkbox    = Checkbox,
   Elevated    = Elevated,
   SimpleButton = SimpleButton,
+  ------
+  base        = Base,
+  textbox     = Textbox,
+  background  = Background,
+  checkbox    = Checkbox,
+  elevated    = Elevated,
+  simplebutton = SimpleButton,
 }

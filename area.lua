@@ -17,30 +17,40 @@ setmetatable(Area, {
 function Area:new(args)
   self = setmetatable({}, Area)
 
+  self.index      = 1
+  self.is_area    = true
+  self.is_navitem = false
+  self.selected   = false
+  self.visited    = false
+
   self.name      = args.name or "unnamed_area"
   self.parent    = args.parent or nil
+  self.nav       = args.nav or nil
+
+  self.on_area_changed = args.on_area_changed or nil
+
+  -- TODO rename to children
   self.items     = args.items or {}
   self.widget    = args.widget or nil
-  self.index     = 1
-  self.is_area   = true
-  self.is_navitem = false
-  self.is_row    = args.is_row or false
-  self.is_column = args.is_column or false
-  self.selected  = false
-  self.visited   = false
-  self.nav       = args.nav or nil
-  self.confine   = args.confine or false
-  self.circular  = args.circular or false
-  self.keys      = args.keys or nil
 
-  self.is_grid   = args.is_grid or nil
+  self.circular  = args.circular or false
+
+  -- Custom keybindings
+  self.keys = args.keys or nil
+
+  -- tf does this do?
+  self.confine   = args.confine or false
+
+  self.is_grid   = args.is_grid   or false
   self.grid_rows = args.grid_rows or nil
   self.grid_cols = args.grid_cols or nil
 
   -- If the area contains a grid of navitems. Needed because grid navigation has a very
   -- specific algorithm.
-  -- TODO fix the dumbass algorithm
+  -- TODO fix the dumbass algorithm and remove this shit
   self.is_grid_container = args.is_grid_container or false
+  self.is_row    = args.is_row or false
+  self.is_column = args.is_column or false
 
   -- If the current item highlight should persist when switching to another area.
   self.hl_persist_on_area_switch = args.hl_persist_on_area_switch or false
@@ -75,6 +85,18 @@ function Area:append(item)
   table.insert(self.items, item)
 end
 
+-- TODO replace append() with add()
+-- Add item to area's item table.
+function Area:add(item)
+  if item.is_area then
+    item.parent = self
+    if self.nav then
+      item.nav = self.nav
+    end
+  end
+  self.items[#self.items+1] = item
+end
+
 -- Returns if current area contains a given area.
 function Area:contains(item)
   if not item.is_area then return end
@@ -98,7 +120,7 @@ function Area:get_focused_item()
   return self.items[self.index]
 end
 
--- TODO: Replace with set_curr_item
+-- TODO: Replace with set_focused_item
 --- Set focused item to the item at the given index.
 -- @param idx Index to set
 function Area:set_curr_item(idx)
@@ -107,19 +129,23 @@ function Area:set_curr_item(idx)
       self.items[self.index]:select_off()
     end
     self.index = idx
-    self.items[self.index]:select_on()
+    if self.items[self.index].select_on then
+      self.items[self.index]:select_on()
+    end
   end
 end
 
--- function Area:set_focused_item(idx)
---   if idx > 0 and idx <= #self.items then
---     if self.items[self.index] then
---       self.items[self.index]:select_off()
---     end
---     self.index = idx
---     self.items[self.index]:select_on()
---   end
--- end
+function Area:set_focused_index(idx)
+  if idx > 0 and idx <= #self.items then
+    if self.items[self.index] then
+      self.items[self.index]:select_off()
+    end
+    self.index = idx
+    if self.items[self.index].select_on then
+      self.items[self.index]:select_on()
+    end
+  end
+end
 
 --- Remove an item from a given index in the item table.
 -- @index Index of item to remove.
@@ -195,9 +221,19 @@ function Area:remove_all_except_item(item)
   return #self.items == 1 and self.items[1] == item
 end
 
--- Reset area to defaults.
+--- Reset area to defaults while removing all children.
 -- Deselect any children and set the index back to 1.
 function Area:reset()
+  self:select_off_recursive()
+  self:reset_visited_recursive()
+  self:reset_index_recursive()
+  self.index = 1
+  self:remove_all_items()
+end
+
+--- Reset area to defaults WITHOUT removing any children.
+-- Deselect any children and set the index back to 1.
+function Area:soft_reset()
   self:select_off_recursive()
   self:reset_visited_recursive()
   self:reset_index_recursive()
@@ -246,10 +282,9 @@ function Area:select_toggle_recurse_up()
 end
 
 -- Turn off highlight for associated widget
+-- TODO fucking confusing
 function Area:select_off()
-  if self.widget then
-    self.widget:select_off()
-  end
+  if self.widget then self.widget:select_off() end
 end
 
 -- Turn off highlight for all child items
@@ -346,18 +381,13 @@ function Area:verify_nav_references()
 end
 
 -- Print area contents.
-function Area:dump()
-  --print("\nDUMP: Current pos is "..self.name.."("..self.index..")")
-  self:_dump()
-end
-
-function Area:_dump(space)
+function Area:dump(space)
   space = space or ""
   print(space.."'"..self.name.."["..tostring(self.index).."]': "..#self.items.." items")
   space = space .. "  "
   for i = 1, #self.items do
     if self.items[i].is_area then
-      self.items[i]:_dump(space .. "  ")
+      self.items[i]:dump(space .. "  ")
     end
   end
 end
