@@ -63,8 +63,9 @@ function navigator:farea()
 end
 
 function navigator:fitem()
-  return self.focused_area.active_element
+  return self:farea().active_element
 end
+
 
 -- █▄░█ ▄▀█ █░█ █ █▀▀ ▄▀█ ▀█▀ █▀▀ 
 -- █░▀█ █▀█ ▀▄▀ █ █▄█ █▀█ ░█░ ██▄ 
@@ -74,6 +75,11 @@ end
 function navigator:iter_between_areas(dir)
   dbprint('iter_between_area('..pdir[dir]..')')
   add_space()
+
+  if not self:farea() or not self:fitem() then
+    dbprint('no focused area or no focused item; returning')
+    return
+  end
 
   -- If the current focused item is an area
   if self:fitem().type == "area" then
@@ -93,6 +99,11 @@ end
 -- @brief Iterate within the current focused area's items.
 function navigator:iter_within_area(dir)
   dbprint('iter_within_area('..pdir[dir]..')')
+
+  if not self:farea() or not self:fitem() then
+    dbprint('no focused area or no focused item; returning')
+    return
+  end
 
   -- If current focused item is an area, iterate
   -- within that area
@@ -134,17 +145,22 @@ end
 -- █░█ ██▄ ░█░ ▄█ 
 
 --- @method check_keybinds
--- @brief Checks if a key is associated with any keybinds.
+-- @brief Checks if a key is associated with any keybinds, then
+-- execute that keybind.
 function navigator:check_keybinds(key, area)
   dbprint('check_keybinds('..key..')')
+  add_space()
   if not area then area = self:farea() end
 
   -- Start from the lowest level and work your way up
   if area.keys[key] then
+    dbprint('keybind found')
     area.keys[key]()
   else
     if area.parent then
       area = area.parent
+      dbprint('no keybind found - recursing up')
+      add_space()
       self:check_keybinds(key, area)
     end
   end
@@ -156,8 +172,14 @@ end
 --              horizontal, vertical, jump, release, ends
 -- @param dir   LEFT, RIGHT, or NONE
 function navigator:handle_key(type, dir)
+  if not self:farea() or not self:fitem() then
+    dbprint('no focused area or no focused item; returning')
+    return
+  end
+
   dbprint('handle_key('..type..', '..pdir[dir]..')')
   add_space()
+
   if type == "horizontal" or type == "vertical" then
     self:iter_within_area(dir)
   elseif type == "jump" then
@@ -178,7 +200,7 @@ function navigator:keypressed(key)
   print("")
   spaces = ""
   if key == "q" then
-    dbprint("\nDUMP: Current pos is "..self.focused_area.name.."("..self:fitem().index..")")
+    dbprint("\nDUMP: Current pos is "..self:farea().name.."("..(self:fitem() and self:fitem().index or "-")..")")
     self.root:dump()
   end
 

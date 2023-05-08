@@ -83,22 +83,15 @@ function area:append(item)
 
   -- Update item references
   print('  There are '..#self.items..' items in this area')
-  if self.circular then
-    if #self.items > 0 then
-      last.next  = item
-      first.prev = item
-      item.prev  = last
-      item.next  = first
-    else
-      self.active_element = item
-      item.prev = item
-      item.next = item
-    end
+  if #self.items > 0 then
+    last.next  = item
+    first.prev = item
+    item.prev  = last
+    item.next  = first
   else
-    -- TODO: Non-circular stuff 
-    if #self.items > 0 then
-    else
-    end
+    self.active_element = item
+    item.prev = item
+    item.next = item
   end
 
   self.items[#self.items+1] = item
@@ -134,9 +127,10 @@ end
 -- @brief Print area contents
 function area:dump(space)
   space = space or ""
-  print(space.."'"..self.name.."["..(self.active_element and self.active_element.index or 0).."]"..
-        '(P:'..self.active_element.prev.index..', N:'..self.active_element.next.index..')'..
-        ":"..#self.items.." items")
+  local actelm = self.active_element
+  print(space.."'"..self.name.."["..(actelm and actelm.index or 0).."] "..
+        '(P:'..(actelm and self.active_element.prev.index or "-")..
+        ', N:'..(actelm and self.active_element.next.index or "-")..')'.. ": "..#self.items.." items")
   space = space .. "  "
   for i = 1, #self.items do
     if self.items[i].type == "area" then
@@ -147,20 +141,49 @@ function area:dump(space)
   end
 end
 
+--- @method contains_area
+-- Check if this area contains a given area.
+-- For this to work properly, the area's names must be set.
+-- @param target (string) The name of the area to look for
+function area:contains_area(target)
+  for i = 1, #self.items do
+    if self.items[i].type == "area" then
+      if self.items[i].name == target then
+        return true
+      else
+        return self.items[i]:contains_area(target)
+      end
+    end
+  end
+  return false
+end
+
+--- @method verify_nav_references
+-- @brief Make sure every sub-area contained within this one has
+-- a reference to the main navigator. This is so an area can send signals
+-- to the navigator. This function is only called on the nav_root area.
+function area:verify_nav_references()
+  for i = 1, #self.items do
+    if self.items[i].type == area then
+      self.items[i].nav = self.nav
+      self.items[i]:verify_nav_references()
+    end
+  end
+end
 
 -- ▄▀█ █▀▀ ▀█▀ █ █▀█ █▄░█ █▀ 
 -- █▀█ █▄▄ ░█░ █ █▄█ █░▀█ ▄█ 
 
 function area:select_on()
-  self.active_element:select_on()
+  if self.active_element then self.active_element:select_on() end
   if self.widget then self.widget:select_on() end
 end
 
 function area:select_off()
-  self.active_element:select_off()
+  if self.active_element then self.active_element:select_off() end
   if self.widget then self.widget:select_off() end
 end
 
-function area:release()    end
+function area:release() end
 
 return area
