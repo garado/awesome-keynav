@@ -28,13 +28,17 @@ function area:new(args)
   args = args or {}
   self = setmetatable({}, area)
 
+  self.widget = args.widget
   self.name = args.name or "unnamed_area"
   self.type = "area"
 
+  -- Index within parent (areas can be items within another area)
   self.index = 1
 
-  self.circular = args.circular or false
+  -- TODO: Unused
+  self.circular = args.circular or true
 
+  -- Doubly linked list stuff
   self.parent = nil
   self.next = self
   self.prev = self
@@ -45,6 +49,9 @@ function area:new(args)
       self:append(args.items[i])
     end
   end
+
+  -- Keybound functions
+  self.keys = args.keys or {}
 
   return self
 end
@@ -66,11 +73,7 @@ function area:prepend(item) end
 -- @brief Append new item to end of list
 function area:append(item)
   print()
-  if item.widget then
-    print('Appending item '..item.widget.text..' to '..self.name)
-  else
-    print('Appending item to '..self.name)
-  end
+  print('Appending item to '..self.name)
 
   item.index = #self.items + 1
   item.parent = self
@@ -80,15 +83,22 @@ function area:append(item)
 
   -- Update item references
   print('  There are '..#self.items..' items in this area')
-  if #self.items > 0 then
-    last.next  = item
-    first.prev = item
-    item.prev  = last
-    item.next  = first
+  if self.circular then
+    if #self.items > 0 then
+      last.next  = item
+      first.prev = item
+      item.prev  = last
+      item.next  = first
+    else
+      self.active_element = item
+      item.prev = item
+      item.next = item
+    end
   else
-    self.active_element = item
-    item.prev = item
-    item.next = item
+    -- TODO: Non-circular stuff 
+    if #self.items > 0 then
+    else
+    end
   end
 
   self.items[#self.items+1] = item
@@ -113,6 +123,9 @@ function area:iter(dir)
   return self.active_element
 end
 
+function area:set_active_element(index)
+  self.active_element = self.items[index]
+end
 
 -- █▀▄▀█ █ █▀ █▀▀ 
 -- █░▀░█ █ ▄█ █▄▄ 
@@ -134,8 +147,20 @@ function area:dump(space)
   end
 end
 
-function area:select_on()  end
-function area:select_off() end
+
+-- ▄▀█ █▀▀ ▀█▀ █ █▀█ █▄░█ █▀ 
+-- █▀█ █▄▄ ░█░ █ █▄█ █░▀█ ▄█ 
+
+function area:select_on()
+  self.active_element:select_on()
+  if self.widget then self.widget:select_on() end
+end
+
+function area:select_off()
+  self.active_element:select_off()
+  if self.widget then self.widget:select_off() end
+end
+
 function area:release()    end
 
 return area

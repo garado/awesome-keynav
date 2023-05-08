@@ -5,6 +5,7 @@
 local awful   = require("awful")
 local gobject = require("gears.object")
 local path    = (...):match("(.-)[^%.]+$")
+local math    = math
 
 -- For printing stacktrace
 local debug_mode = true
@@ -42,7 +43,6 @@ function navigator:new(args)
   self.root  = require(path .. "area")({
     name = "root",
     nav  = self,
-    circular = true,
   })
 
   return self, self.root
@@ -75,6 +75,13 @@ function navigator:iter_between_areas(dir)
   dbprint('iter_between_area('..pdir[dir]..')')
   add_space()
 
+  -- If the current focused item is an area
+  if self:fitem().type == "area" then
+    self.focused_area = self:fitem()
+    self:iter_within_area(NONE)
+    return
+  end
+
   if dir == LEFT then
     self.focused_area = self.focused_area.prev
   elseif dir == RIGHT then
@@ -103,8 +110,45 @@ function navigator:iter_within_area(dir)
   end
 end
 
+--- @method jump_to_end
+-- @brief Jump to end of area
+function navigator:jump_to_end(dir)
+  dbprint('jump_to_end('..pdir[dir]..')')
+
+  if dir == LEFT then
+    self:farea():set_active_element(1)
+  elseif dir == RIGHT then
+    local num_items = #self:farea().items
+    self:farea():set_active_element(num_items)
+  end
+end
+
+--- @method jump_to_middle
+-- @brief Jump to middle
+function navigator:jump_to_middle()
+  local mid = math.floor((#self:farea().items / 2) + 0.5)
+  self:farea():set_active_element(mid)
+end
+
 -- █▄▀ █▀▀ █▄█ █▀ 
 -- █░█ ██▄ ░█░ ▄█ 
+
+--- @method check_keybinds
+-- @brief Checks if a key is associated with any keybinds.
+function navigator:check_keybinds(key, area)
+  dbprint('check_keybinds('..key..')')
+  if not area then area = self:farea() end
+
+  -- Start from the lowest level and work your way up
+  if area.keys[key] then
+    area.keys[key]()
+  else
+    if area.parent then
+      area = area.parent
+      self:check_keybinds(key, area)
+    end
+  end
+end
 
 --- @method handle_key
 -- @brief Execute functions for direction keys
@@ -118,14 +162,19 @@ function navigator:handle_key(type, dir)
     self:iter_within_area(dir)
   elseif type == "jump" then
     self:iter_between_areas(dir)
+  elseif type == "ends" then
+    self:jump_to_end(dir)
+  elseif type == "middle" then
+    self:jump_to_middle()
   end
 end
 
 --- @method keypressed
 -- @brief Runs every time a key is pressed
 function navigator:keypressed(key)
-  self:fitem():select_off()
+  self:farea():select_off()
 
+  -- Debug stuff
   print("")
   spaces = ""
   if key == "q" then
@@ -137,8 +186,12 @@ function navigator:keypressed(key)
   local type = ""
   if key == "j" or key == "k" then type = "vertical" end
   if key == "h" or key == "l" then type = "horizontal" end
+
   if key == "Tab" or key == "BackSpace" then type = "jump" end
+
   if key == "Return" then type = "release" end
+
+  if key == "z" and self.last_key == "z" then type = "middle" end
   if key == "g" and self.last_key == "g" then type = "ends" end
   if key == "G" then type = "ends" end
 
@@ -156,13 +209,17 @@ function navigator:keypressed(key)
     ["jump"]       = true, -- move between areas
     ["release"]    = true,
     ["ends"]       = true, -- like vim gg/GG
+    ["middle"]     = true, -- like vim zz
   }
 
   if valid_nav_types[type] then
     self:handle_key(type, dir)
+  else
+    self:check_keybinds(key)
   end
 
-  self:fitem():select_on()
+  self.last_key = key
+  self:farea():select_on()
 end
 
 --- @method keypressed
