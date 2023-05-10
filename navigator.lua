@@ -2,6 +2,9 @@
 -- █▄░█ ▄▀█ █░█ █ █▀▀ ▄▀█ ▀█▀ █▀█ █▀█ 
 -- █░▀█ █▀█ ▀▄▀ █ █▄█ █▀█ ░█░ █▄█ █▀▄ 
 
+-- Responsible for moving around through the navtree and
+-- executing keybinds.
+
 local awful   = require("awful")
 local gobject = require("gears.object")
 local path    = (...):match("(.-)[^%.]+$")
@@ -70,16 +73,37 @@ end
 -- █▄░█ ▄▀█ █░█ █ █▀▀ ▄▀█ ▀█▀ █▀▀ 
 -- █░▀█ █▀█ ▀▄▀ █ █▄█ █▀█ ░█░ ██▄ 
 
+--- @method handle_navkey
+-- @brief Execute navigation functions for direction keys.
+-- @param type  A navigation type:
+--              horizontal, vertical, jump, release, ends, middle
+-- @param dir   LEFT, RIGHT, or NONE
+function navigator:handle_navkey(type, dir)
+  if not self:farea() or not self:fitem() then return end
+
+  dbprint('handle_navkey('..type..', '..pdir[dir]..')')
+  add_space()
+
+  if type == "horizontal" or type == "vertical" then
+    self:iter_within_area(dir)
+  elseif type == "jump" then
+    self:iter_between_areas(dir)
+  elseif type == "ends" then
+    self:jump_to_end(dir)
+  elseif type == "middle" then
+    self:jump_to_middle()
+  elseif type == "release" then
+    self:fitem():release()
+  end
+end
+
 --- @method iter_between_areas
 -- @brief Move to the current focused area's neighbors.
 function navigator:iter_between_areas(dir)
+  if not self:farea() or not self:fitem() then return end
+
   dbprint('iter_between_area('..pdir[dir]..')')
   add_space()
-
-  if not self:farea() or not self:fitem() then
-    dbprint('no focused area or no focused item; returning')
-    return
-  end
 
   -- If the current focused item is an area
   if self:fitem().type == "area" then
@@ -88,22 +112,19 @@ function navigator:iter_between_areas(dir)
     return
   end
 
-  if dir == LEFT then
-    self.focused_area = self.focused_area.prev
-  elseif dir == RIGHT then
-    self.focused_area = self.focused_area.next
+  -- If there are no items in the next area, then don't go anywhere
+  local next_area = dir == LEFT and self:farea().prev or self:farea().next
+  if #next_area.items ~= 0 then
+    self.focused_area = next_area
   end
 end
 
 --- @method iter_within_area
 -- @brief Iterate within the current focused area's items.
 function navigator:iter_within_area(dir)
-  dbprint('iter_within_area('..pdir[dir]..')')
+  if not self:farea() or not self:fitem() then return end
 
-  if not self:farea() or not self:fitem() then
-    dbprint('no focused area or no focused item; returning')
-    return
-  end
+  dbprint('iter_within_area('..pdir[dir]..')')
 
   -- If current focused item is an area, iterate
   -- within that area
@@ -124,6 +145,8 @@ end
 --- @method jump_to_end
 -- @brief Jump to end of area
 function navigator:jump_to_end(dir)
+  if not self:farea() or not self:fitem() then return end
+
   dbprint('jump_to_end('..pdir[dir]..')')
 
   if dir == LEFT then
@@ -137,6 +160,7 @@ end
 --- @method jump_to_middle
 -- @brief Jump to middle
 function navigator:jump_to_middle()
+  if not self:farea() or not self:fitem() then return end
   local mid = math.floor((#self:farea().items / 2) + 0.5)
   self:farea():set_active_element(mid)
 end
@@ -146,48 +170,19 @@ end
 
 --- @method check_keybinds
 -- @brief Checks if a key is associated with any keybinds, then
--- execute that keybind.
+-- execute that keybind. Recurse through parent areas if not found.
 function navigator:check_keybinds(key, area)
-  dbprint('check_keybinds('..key..')')
   add_space()
   if not area then area = self:farea() end
 
   -- Start from the lowest level and work your way up
   if area.keys[key] then
-    dbprint('keybind found')
     area.keys[key]()
   else
     if area.parent then
       area = area.parent
-      dbprint('no keybind found - recursing up')
-      add_space()
       self:check_keybinds(key, area)
     end
-  end
-end
-
---- @method handle_key
--- @brief Execute functions for direction keys
--- @param type  A navigation type:
---              horizontal, vertical, jump, release, ends
--- @param dir   LEFT, RIGHT, or NONE
-function navigator:handle_key(type, dir)
-  if not self:farea() or not self:fitem() then
-    dbprint('no focused area or no focused item; returning')
-    return
-  end
-
-  dbprint('handle_key('..type..', '..pdir[dir]..')')
-  add_space()
-
-  if type == "horizontal" or type == "vertical" then
-    self:iter_within_area(dir)
-  elseif type == "jump" then
-    self:iter_between_areas(dir)
-  elseif type == "ends" then
-    self:jump_to_end(dir)
-  elseif type == "middle" then
-    self:jump_to_middle()
   end
 end
 
@@ -197,7 +192,7 @@ function navigator:keypressed(key)
   self:farea():select_off()
 
   -- Debug stuff
-  print("")
+  dbprint("")
   spaces = ""
   if key == "q" then
     dbprint("\nDUMP: Current pos is "..self:farea().name.."("..(self:fitem() and self:fitem().index or "-")..")")
@@ -235,7 +230,7 @@ function navigator:keypressed(key)
   }
 
   if valid_nav_types[type] then
-    self:handle_key(type, dir)
+    self:handle_navkey(type, dir)
   else
     self:check_keybinds(key)
   end
@@ -258,7 +253,7 @@ function navigator:start()
   self.keygrabber = awful.keygrabber {
     -- TODO: The stop key should depend on whatever keyboard
     -- shortcut opened the navigator
-    stop_key   = "Alt_L",
+    stop_key   = "Mod4",
     stop_event = "press",
     autostart  = true,
     keypressed_callback  = function(_, _, key, _)
