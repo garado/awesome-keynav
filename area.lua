@@ -9,6 +9,11 @@ local LEFT  = -1
 local NONE  = 0
 local RIGHT = 1
 
+local debug = true
+local function dbprint(...)
+  if debug then print(...) end
+end
+
 local pdir = {
   [0]  = "NONE",
   [1]  = "RIGHT",
@@ -53,6 +58,9 @@ function area:new(args)
   -- Keybound functions
   self.keys = args.keys or {}
 
+  -- Reference to navigator
+  self.nav = args.nav
+
   return self
 end
 
@@ -72,8 +80,8 @@ function area:prepend(item) end
 --- @method append
 -- @brief Append new item to end of list
 function area:append(item)
-  print()
-  print('Appending item to '..self.name)
+  dbprint()
+  dbprint('Appending item to '..self.name)
 
   item.index = #self.items + 1
   item.parent = self
@@ -82,7 +90,7 @@ function area:append(item)
   local first = self.items[1]
 
   -- Update item references
-  print('  There are '..#self.items..' items in this area')
+  dbprint('  There are '..#self.items..' items in this area')
   if #self.items > 0 then
     last.next  = item
     first.prev = item
@@ -96,8 +104,47 @@ function area:append(item)
 
   self.items[#self.items+1] = item
 
-  print('  Inserted at position '..item.index)
+  dbprint('  Inserted at position '..item.index)
   self:dump()
+end
+
+--- @method remove
+-- @brief Remove a subarea from this area.
+-- @param target (string) The name of the area to remove.
+function area:remove_area(target)
+  for i = 1, #self.items do
+    if self.items[i].type == "area" then
+      if self.items[i].name == target then
+
+        -- Fix doubly linked list references
+        local target_prev = self.items[i].prev
+        local target_next = self.items[i].next
+        target_prev.next = target_next
+        target_next.prev = target_prev
+
+        table.remove(self.items, i)
+
+        self:update_indices()
+        self.nav:emit_signal("area::removed", target)
+        return
+      else
+        self.items[i]:remove_area(target)
+      end
+    end
+  end
+end
+
+--- @method clear
+-- @brief Remove all items from this area.
+function area:clear()
+  print('=== AREA: CLEAR')
+  if self.nav then
+    self.nav:emit_signal("area::cleared")
+  else
+    print('NO nav!')
+  end
+  self.active_element = nil
+  self.items = {}
 end
 
 
@@ -107,7 +154,7 @@ end
 --- @method iter
 -- @param dir
 function area:iter(dir)
-  print('area::iter('..pdir[dir]..')')
+  dbprint('area::iter('..pdir[dir]..')')
   if dir == LEFT then
     self.active_element = self.active_element.prev
   elseif dir == RIGHT then
@@ -128,7 +175,7 @@ end
 function area:dump(space)
   space = space or ""
   local actelm = self.active_element
-  print(space.."'"..self.name.."["..(actelm and actelm.index or 0).."] "..
+  dbprint(space.."'"..self.name.."["..(actelm and actelm.index or 0).."] "..
         '(P:'..(actelm and self.active_element.prev.index or "-")..
         ', N:'..(actelm and self.active_element.next.index or "-")..')'.. ": "..#self.items.." items")
   space = space .. "  "
@@ -136,7 +183,7 @@ function area:dump(space)
     if self.items[i].type == "area" then
       self.items[i]:dump(space .. "  ")
     else
-      print(space..'['..i..'] P:'..self.items[i].prev.index..' N:'..self.items[i].next.index)
+      dbprint(space..'['..i..'] P:'..self.items[i].prev.index..' N:'..self.items[i].next.index)
     end
   end
 end
@@ -168,6 +215,15 @@ function area:verify_nav_references()
       self.items[i].nav = self.nav
       self.items[i]:verify_nav_references()
     end
+  end
+end
+
+--- @method update_indices
+-- @brief Update item indices. Usually called after something has been
+-- removed.
+function area:update_indices()
+  for i = 1, #self.items do
+    self.items[i].index = i
   end
 end
 

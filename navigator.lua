@@ -48,6 +48,8 @@ function navigator:new(args)
     nav  = self,
   })
 
+  self:connect_signal("area::cleared", self.handle_cleared_area)
+
   return self, self.root
 end
 
@@ -165,6 +167,13 @@ function navigator:jump_to_middle()
   self:farea():set_active_element(mid)
 end
 
+--- @method handle_cleared_area
+-- @brief Sets the focused area back to root. Called when an area is cleared.
+-- NOTE: Really strange naming and usage
+function navigator:handle_cleared_area()
+  self.focused_area = self.root
+end
+
 -- █▄▀ █▀▀ █▄█ █▀ 
 -- █░█ ██▄ ░█░ ▄█ 
 
@@ -249,6 +258,7 @@ end
 -- keybound functions.
 function navigator:start()
   self.focused_area = self.focused_area or self.root
+  self.root:verify_nav_references()
 
   self.keygrabber = awful.keygrabber {
     -- TODO: The stop key should depend on whatever keyboard
