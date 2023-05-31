@@ -24,6 +24,27 @@ local function base(class, args)
   return ret
 end
 
+local _base = {}
+setmetatable(_base, {
+  __call  = function(cls, ...)
+    return base(cls, ...)
+  end,
+})
+
+function _base:select_on()
+  self.selected = true
+  self.widget:emit_signal("mouse::enter")
+end
+
+function _base:select_off()
+  self.selected = false
+  self.widget:emit_signal("mouse::leave")
+end
+
+function _base:release()
+  self.widget:emit_signal("button::press")
+end
+
 -- ▀█▀ █▀▀ ▀▄▀ ▀█▀ █▄▄ █▀█ ▀▄▀ 
 -- ░█░ ██▄ █░█ ░█░ █▄█ █▄█ █░█ 
 
@@ -103,7 +124,7 @@ function btn:release()
 end
 
 return {
-  base = base,
+  base = _base,
   textbox = textbox,
   background = background,
   btn = btn,
