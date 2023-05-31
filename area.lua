@@ -5,6 +5,8 @@
 -- Basic unit for the nav hierarchy. An area's items can be
 -- navelements or other areas.
 
+local gobject = require("gears.object")
+
 local LEFT  = -1
 local NONE  = 0
 local RIGHT = 1
@@ -31,7 +33,7 @@ setmetatable(area, {
 
 function area:new(args)
   args = args or {}
-  self = setmetatable({}, area)
+  self = setmetatable(gobject{}, area)
 
   self.widget = args.widget
   self.name = args.name or "unnamed_area"
@@ -57,6 +59,7 @@ function area:new(args)
 
   -- Keybound functions
   self.keys = args.keys or {}
+  self.override_keys = args.override_keys or {}
 
   -- Reference to navigator
   self.nav = args.nav
@@ -64,10 +67,13 @@ function area:new(args)
   return self
 end
 
+function area:__concat()
+  return self.name
+end
+
 function area:__eq(b)
   return self.name == b.name
 end
-
 
 -- █ █▄░█ █▀ █▀▀ █▀█ ▀█▀ ░░▄▀ █▀▄ █▀▀ █░░ █▀▀ ▀█▀ █▀▀ 
 -- █ █░▀█ ▄█ ██▄ █▀▄ ░█░ ▄▀░░ █▄▀ ██▄ █▄▄ ██▄ ░█░ ██▄ 
@@ -108,7 +114,7 @@ function area:append(item)
   self:dump()
 end
 
---- @method remove
+--- @method remove_area
 -- @brief Remove a subarea from this area.
 -- @param target (string) The name of the area to remove.
 function area:remove_area(target)
@@ -137,12 +143,7 @@ end
 --- @method clear
 -- @brief Remove all items from this area.
 function area:clear()
-  print('=== AREA: CLEAR')
-  if self.nav then
-    self.nav:emit_signal("area::cleared")
-  else
-    print('NO nav!')
-  end
+  if self.nav then self.nav:emit_signal("area::cleared") end
   self.active_element = nil
   self.items = {}
 end
@@ -154,7 +155,7 @@ end
 --- @method iter
 -- @param dir
 function area:iter(dir)
-  dbprint('area::iter('..pdir[dir]..')')
+  -- dbprint('area::iter('..pdir[dir]..')')
   if dir == LEFT then
     self.active_element = self.active_element.prev
   elseif dir == RIGHT then
@@ -163,7 +164,11 @@ function area:iter(dir)
   return self.active_element
 end
 
-function area:set_active_element(index)
+function area:set_active_element(element)
+  self.active_element = element
+end
+
+function area:set_active_element_by_index(index)
   self.active_element = self.items[index]
 end
 
@@ -211,7 +216,7 @@ end
 -- to the navigator. This function is only called on the nav_root area.
 function area:verify_nav_references()
   for i = 1, #self.items do
-    if self.items[i].type == area then
+    if self.items[i].type == "area" then
       self.items[i].nav = self.nav
       self.items[i]:verify_nav_references()
     end
