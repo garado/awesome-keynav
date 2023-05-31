@@ -27,6 +27,13 @@ local pdir = {
   [-1] = "LEFT",
 }
 
+local mod = {
+  ["Shift_L"] = true,
+  ["Shift_R"] = true,
+  ["Control_L"] = true,
+  ["Control_R"] = true,
+}
+
 ---
 
 local navigator = {}
@@ -83,7 +90,7 @@ end
 function navigator:handle_navkey(type, dir)
   if not self:farea() or not self:fitem() then return end
 
-  dbprint('handle_navkey('..type..', '..pdir[dir]..')')
+  -- dbprint('handle_navkey('..type..', '..pdir[dir]..')')
   add_space()
 
   if type == "horizontal" or type == "vertical" then
@@ -104,7 +111,7 @@ end
 function navigator:iter_between_areas(dir)
   if not self:farea() or not self:fitem() then return end
 
-  dbprint('iter_between_area('..pdir[dir]..')')
+  -- dbprint('iter_between_area('..pdir[dir]..')')
   add_space()
 
   -- If the current focused item is an area
@@ -126,12 +133,12 @@ end
 function navigator:iter_within_area(dir)
   if not self:farea() or not self:fitem() then return end
 
-  dbprint('iter_within_area('..pdir[dir]..')')
+  -- dbprint('iter_within_area('..pdir[dir]..')')
 
   -- If current focused item is an area, iterate
   -- within that area
   if self:fitem().type == "area" then
-    dbprint('focused item is an area - traversing within')
+    -- dbprint('focused item is an area - traversing within')
     add_space()
     self.focused_area = self:fitem()
     return self:iter_within_area(NONE)
@@ -139,7 +146,7 @@ function navigator:iter_within_area(dir)
   -- If current focused item is a navitem, move to the
   -- next one like normal
   elseif self:fitem().type == "navitem" then
-    dbprint('focused item is a navitem - iterating like normal')
+    -- dbprint('focused item is a navitem - iterating like normal')
     self.focused_area:iter(dir)
   end
 end
@@ -149,13 +156,13 @@ end
 function navigator:jump_to_end(dir)
   if not self:farea() or not self:fitem() then return end
 
-  dbprint('jump_to_end('..pdir[dir]..')')
+  -- dbprint('jump_to_end('..pdir[dir]..')')
 
   if dir == LEFT then
-    self:farea():set_active_element(1)
+    self:farea():set_active_element_by_index(1)
   elseif dir == RIGHT then
     local num_items = #self:farea().items
-    self:farea():set_active_element(num_items)
+    self:farea():set_active_element_by_index(num_items)
   end
 end
 
@@ -164,13 +171,14 @@ end
 function navigator:jump_to_middle()
   if not self:farea() or not self:fitem() then return end
   local mid = math.floor((#self:farea().items / 2) + 0.5)
-  self:farea():set_active_element(mid)
+  self:farea():set_active_element_by_index(mid)
 end
 
 --- @method handle_cleared_area
 -- @brief Sets the focused area back to root. Called when an area is cleared.
 -- NOTE: Really strange naming and usage
 function navigator:handle_cleared_area()
+  print('navigator: handle cleared area')
   self.focused_area = self.root
 end
 
@@ -186,7 +194,7 @@ function navigator:check_keybinds(key, area)
 
   -- Start from the lowest level and work your way up
   if area.keys[key] then
-    area.keys[key]()
+    area.keys[key](area)
   else
     if area.parent then
       area = area.parent
@@ -195,10 +203,30 @@ function navigator:check_keybinds(key, area)
   end
 end
 
+--- @method check_override_keybinds
+-- @brief Checks if a key is associated with any override keybinds, then
+-- execute that keybind. Recurse through parent areas if not found.
+function navigator:check_override_keybinds(key, area)
+  add_space()
+  if not area then area = self:farea() end
+
+  -- Start from the lowest level and work your way up
+  if area.override_keys[key] then
+    area.override_keys[key](area)
+    return true
+  else
+    if area.parent then
+      area = area.parent
+      return self:check_override_keybinds(key, area)
+    end
+  end
+  return false
+end
+
 --- @method keypressed
 -- @brief Runs every time a key is pressed
 function navigator:keypressed(key)
-  self:farea():select_off()
+  self.last_area = self.focused_area
 
   -- Debug stuff
   dbprint("")
@@ -238,14 +266,26 @@ function navigator:keypressed(key)
     ["middle"]     = true, -- like vim zz
   }
 
-  if valid_nav_types[type] then
-    self:handle_navkey(type, dir)
-  else
+  -- override_keys{} take priority over navigational keybinds, and if one exists, the nav keybind is not executed.
+  -- keys{} are executed alongside nav keybinds.
+  -- the 'lastkey' stuff is for keybinds like zz, gg, GG
+  if not self:check_override_keybinds(key) and not (self.last_key and self:check_override_keybinds(self.last_key .. key)) then
+    if valid_nav_types[type] then
+      self:farea():select_off()
+      self:handle_navkey(type, dir)
+      self:farea():select_on()
+    end
+
     self:check_keybinds(key)
+    if self.last_key then self:check_keybinds(self.last_key .. key) end
   end
 
   self.last_key = key
-  self:farea():select_on()
+
+  if self.last_area ~= self.focused_area then
+    self.last_area:emit_signal("area::left")
+    self.focused_area:emit_signal("area::enter")
+  end
 end
 
 --- @method keypressed
