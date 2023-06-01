@@ -175,11 +175,12 @@ function navigator:jump_to_middle()
 end
 
 --- @method handle_cleared_area
--- @brief Sets the focused area back to root. Called when an area is cleared.
--- NOTE: Really strange naming and usage
+-- @brief If an area gets cleared and the navigator is currently somewhere within
+-- that area, reset focus to root.
 function navigator:handle_cleared_area()
-  print('navigator: handle cleared area')
-  self.focused_area = self.root
+  if not self.root:contains_area(self:farea().name) then
+    self.focused_area = self.root
+  end
 end
 
 -- █▄▀ █▀▀ █▄█ █▀ 
@@ -227,6 +228,12 @@ end
 -- @brief Runs every time a key is pressed
 function navigator:keypressed(key)
   self.last_area = self.focused_area
+
+  if self:farea().name == "root" then
+    if #self:farea().items > 0 and self:farea().items[1].autofocus then
+      self:iter_within_area(NONE)
+    end
+  end
 
   -- Debug stuff
   dbprint("")

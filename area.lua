@@ -45,6 +45,8 @@ function area:new(args)
   -- TODO: Unused
   self.circular = args.circular or true
 
+  self.autofocus = args.autofocus or false
+
   -- Doubly linked list stuff
   self.parent = nil
   self.next = self
@@ -86,9 +88,6 @@ function area:prepend(item) end
 --- @method append
 -- @brief Append new item to end of list
 function area:append(item)
-  dbprint()
-  dbprint('Appending item to '..self.name)
-
   item.index = #self.items + 1
   item.parent = self
 
@@ -96,7 +95,6 @@ function area:append(item)
   local first = self.items[1]
 
   -- Update item references
-  dbprint('  There are '..#self.items..' items in this area')
   if #self.items > 0 then
     last.next  = item
     first.prev = item
@@ -109,9 +107,6 @@ function area:append(item)
   end
 
   self.items[#self.items+1] = item
-
-  dbprint('  Inserted at position '..item.index)
-  self:dump()
 end
 
 --- @method remove_area
@@ -143,6 +138,7 @@ end
 --- @method clear
 -- @brief Remove all items from this area.
 function area:clear()
+  print('clearing '..self.name)
   if self.nav then self.nav:emit_signal("area::cleared") end
   self.active_element = nil
   self.items = {}
@@ -155,7 +151,6 @@ end
 --- @method iter
 -- @param dir
 function area:iter(dir)
-  -- dbprint('area::iter('..pdir[dir]..')')
   if dir == LEFT then
     self.active_element = self.active_element.prev
   elseif dir == RIGHT then
@@ -198,13 +193,10 @@ end
 -- For this to work properly, the area's names must be set.
 -- @param target (string) The name of the area to look for
 function area:contains_area(target)
+  if self.name == target then return true end
   for i = 1, #self.items do
     if self.items[i].type == "area" then
-      if self.items[i].name == target then
-        return true
-      else
-        return self.items[i]:contains_area(target)
-      end
+      if self.items[i]:contains_area(target) then return true end
     end
   end
   return false
