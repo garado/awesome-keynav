@@ -138,10 +138,9 @@ end
 --- @method clear
 -- @brief Remove all items from this area.
 function area:clear()
-  print('clearing '..self.name)
-  if self.nav then self.nav:emit_signal("area::cleared") end
-  self.active_element = nil
   self.items = {}
+  self.active_element = nil
+  if self.nav then self.nav:emit_signal("area::cleared") end
 end
 
 
