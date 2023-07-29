@@ -197,7 +197,13 @@ end
 -- execute that keybind. Recurse through parent areas if not found.
 function navigator:check_keybinds(key, area)
   add_space()
-  if not area then area = self:farea() end
+  if not area then
+    if self:fitem() and self:fitem().type == "area" then
+      area = self:fitem()
+    else
+      area = self:farea()
+    end
+  end
 
   -- Start from the lowest level and work your way up
   if area.keys[key] then
@@ -245,7 +251,7 @@ function navigator:keypressed(key)
   -- dbprint("")
   spaces = ""
   if key == "q" then
-    -- dbprint("\nDUMP: Current pos is "..self:farea().name.."("..(self:fitem() and self:fitem().index or "-")..")")
+    dbprint("\nDUMP: Current pos is "..self:farea().name.."("..(self:fitem() and self:fitem().index or "-")..")")
     self.root:dump()
   end
 
@@ -301,10 +307,6 @@ function navigator:keypressed(key)
   end
 end
 
---- @method keypressed
--- @brief Runs every time a key is released
--- function navigator:keyreleased(key) end
-
 --- @method start
 -- @brief Start keygrabber to traverse through navtree and execute
 -- keybound functions.
@@ -321,9 +323,6 @@ function navigator:start()
     keypressed_callback  = function(_, _, key, _)
       self:keypressed(key)
     end,
-    -- keyreleased = function(_, _, key, _)
-    --   self:keyreleased(key)
-    -- end,
     stop_callback = function()
     end
   }
