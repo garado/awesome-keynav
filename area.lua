@@ -3,7 +3,7 @@
 -- █▀█ █▀▄ ██▄ █▀█ 
 
 -- Basic unit for the nav hierarchy. An area's items can be
--- navelements or other areas.
+-- nav elements or other areas.
 
 local gobject = require("gears.object")
 

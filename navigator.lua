@@ -49,6 +49,8 @@ function navigator:new(args)
   args = args or {}
   self = setmetatable(gobject{}, navigator)
 
+  self.last_key = "nil" -- this has to be a string
+
   -- Set up root area
   self.root  = require(path .. "area")({
     name = "root",
@@ -88,13 +90,18 @@ end
 --              horizontal, vertical, jump, release, ends, middle
 -- @param dir   LEFT, RIGHT, or NONE
 function navigator:handle_navkey(type, dir)
-  if not self:farea() or not self:fitem() then return end
+  if not self:farea() then return end
 
   -- dbprint('handle_navkey('..type..', '..pdir[dir]..')')
   add_space()
 
   if type == "horizontal" or type == "vertical" then
-    self:iter_within_area(dir)
+    if not self:fitem() then
+      self.focused_area = self:farea().parent
+      self:iter_between_areas(dir)
+    else
+      self:iter_within_area(dir)
+    end
   elseif type == "jump" then
     self:iter_between_areas(dir)
   elseif type == "ends" then
@@ -132,20 +139,19 @@ end
 -- @brief Iterate within the current focused area's items.
 function navigator:iter_within_area(dir)
   if not self:farea() or not self:fitem() then return end
-
   -- dbprint('iter_within_area('..pdir[dir]..')')
 
-  -- If current focused item is an area, iterate
+  -- If current focused item is an area, and it has items, iterate
   -- within that area
-  if self:fitem().type == "area" then
+  if self:fitem().type == "area" and #self:fitem().items > 0 then
     -- dbprint('focused item is an area - traversing within')
     add_space()
     self.focused_area = self:fitem()
     return self:iter_within_area(NONE)
 
-  -- If current focused item is a navitem, move to the
-  -- next one like normal
-  elseif self:fitem().type == "navitem" then
+  -- If current focused item is a navitem or an area with no items,
+  -- move to the next one like normal
+  else
     -- dbprint('focused item is a navitem - iterating like normal')
     self.focused_area:iter(dir)
   end
@@ -178,7 +184,7 @@ end
 -- @brief If an area gets cleared and the navigator is currently somewhere within
 -- that area, reset focus to root.
 function navigator:handle_cleared_area()
-  if not self.root:contains_area(self:farea().name) then
+  if not self:farea() or not self.root:contains_area(self:farea().name) then
     self.focused_area = self.root
   end
 end
@@ -236,10 +242,10 @@ function navigator:keypressed(key)
   end
 
   -- Debug stuff
-  dbprint("")
+  -- dbprint("")
   spaces = ""
   if key == "q" then
-    dbprint("\nDUMP: Current pos is "..self:farea().name.."("..(self:fitem() and self:fitem().index or "-")..")")
+    -- dbprint("\nDUMP: Current pos is "..self:farea().name.."("..(self:fitem() and self:fitem().index or "-")..")")
     self.root:dump()
   end
 
@@ -275,8 +281,8 @@ function navigator:keypressed(key)
 
   -- override_keys{} take priority over navigational keybinds, and if one exists, the nav keybind is not executed.
   -- keys{} are executed alongside nav keybinds.
-  -- the 'lastkey' stuff is for keybinds like zz, gg, GG
-  if not self:check_override_keybinds(key) and not (self.last_key and self:check_override_keybinds(self.last_key .. key)) then
+  -- last_key is for keybinds like zz, gg, GG
+  if not self:check_override_keybinds(key) and not self:check_override_keybinds(self.last_key .. key) then
     if valid_nav_types[type] then
       self:farea():select_off()
       self:handle_navkey(type, dir)
@@ -284,7 +290,7 @@ function navigator:keypressed(key)
     end
 
     self:check_keybinds(key)
-    if self.last_key then self:check_keybinds(self.last_key .. key) end
+    self:check_keybinds(self.last_key .. key)
   end
 
   self.last_key = key
@@ -297,8 +303,7 @@ end
 
 --- @method keypressed
 -- @brief Runs every time a key is released
-function navigator:keyreleased(key)
-end
+-- function navigator:keyreleased(key) end
 
 --- @method start
 -- @brief Start keygrabber to traverse through navtree and execute
@@ -316,9 +321,9 @@ function navigator:start()
     keypressed_callback  = function(_, _, key, _)
       self:keypressed(key)
     end,
-    keyreleased = function(_, _, key, _)
-      self:keyreleased(key)
-    end,
+    -- keyreleased = function(_, _, key, _)
+    --   self:keyreleased(key)
+    -- end,
     stop_callback = function()
     end
   }
