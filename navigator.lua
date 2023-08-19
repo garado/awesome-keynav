@@ -1,6 +1,5 @@
-
--- █▄░█ ▄▀█ █░█ █ █▀▀ ▄▀█ ▀█▀ █▀█ █▀█ 
--- █░▀█ █▀█ ▀▄▀ █ █▄█ █▀█ ░█░ █▄█ █▀▄ 
+-- █▄░█ ▄▀█ █░█ █ █▀▀ ▄▀█ ▀█▀ █▀█ █▀█
+-- █░▀█ █▀█ ▀▄▀ █ █▄█ █▀█ ░█░ █▄█ █▀▄
 
 -- Responsible for moving around through the navtree and
 -- executing keybinds.
@@ -11,11 +10,11 @@ local path    = (...):match("(.-)[^%.]+$")
 local math    = math
 
 -- For printing stacktrace
-local debug_mode = true
-local spaces = ""
-local function add_space()  spaces = spaces .. "  " end
-local function sub_space()  spaces = string.gsub(spaces, "^  ", "")   end
-local function dbprint(msg) if debug_mode then print(spaces..msg) end end
+local debug_mode = false
+local spaces     = ""
+local function add_space() spaces = spaces .. "  " end
+local function sub_space() spaces = string.gsub(spaces, "^  ", "") end
+local function dbprint(msg) if debug_mode then print(spaces .. msg) end end
 
 local LEFT  = -1
 local NONE  = 0
@@ -47,24 +46,31 @@ setmetatable(navigator, {
 
 function navigator:new(args)
   args = args or {}
-  self = setmetatable(gobject{}, navigator)
+  self = setmetatable(gobject {}, navigator)
 
-  self.last_key = "nil" -- this has to be a string
+  -- This has to be a string because when checking for keybinds
+  -- with multiple keys, we concat last_key with the current key
+  self.last_key = "nil"
 
   -- Set up root area
-  self.root  = require(path .. "area")({
+  self.root = require(path .. "area")({
     name = "root",
     nav  = self,
   })
+
+  if args.items then
+    for i = 1, #args.items do
+      self.root:append(args.items[i])
+    end
+  end
 
   self:connect_signal("area::cleared", self.handle_cleared_area)
 
   return self, self.root
 end
 
-
--- ▄▀█ █▀▀ █▀▀ █▀▀ █▀ █▀ 
--- █▀█ █▄▄ █▄▄ ██▄ ▄█ ▄█ 
+-- ▄▀█ █▀▀ █▀▀ █▀▀ █▀ █▀
+-- █▀█ █▄▄ █▄▄ ██▄ ▄█ ▄█
 
 -- Syntax gets a little verbose so here's some helper functions
 
@@ -80,9 +86,8 @@ function navigator:fitem()
   return self:farea().active_element
 end
 
-
--- █▄░█ ▄▀█ █░█ █ █▀▀ ▄▀█ ▀█▀ █▀▀ 
--- █░▀█ █▀█ ▀▄▀ █ █▄█ █▀█ ░█░ ██▄ 
+-- █▄░█ ▄▀█ █░█ █ █▀▀ ▄▀█ ▀█▀ █▀▀
+-- █░▀█ █▀█ ▀▄▀ █ █▄█ █▀█ ░█░ ██▄
 
 --- @method handle_navkey
 -- @brief Execute navigation functions for direction keys.
@@ -97,7 +102,7 @@ function navigator:handle_navkey(type, dir)
 
   if type == "horizontal" or type == "vertical" then
     if not self:fitem() then
-      self.focused_area = self:farea().parent
+      self.focused_area = self:parent()
       self:iter_between_areas(dir)
     else
       self:iter_within_area(dir)
@@ -114,25 +119,41 @@ function navigator:handle_navkey(type, dir)
 end
 
 --- @method iter_between_areas
--- @brief Move to the current focused area's neighbors.
+-- @brief Move to the current focused area's neighbor.
 function navigator:iter_between_areas(dir)
   if not self:farea() or not self:fitem() then return end
 
-  -- dbprint('iter_between_area('..pdir[dir]..')')
+  dbprint('iter_between_areas(' .. pdir[dir] .. ')')
   add_space()
 
-  -- If the current focused item is an area
-  if self:fitem().type == "area" then
-    self.focused_area = self:fitem()
+  -- Handle wrapper area edge case
+  if self:parent() and self:parent().is_wrapper then
+    local index = self:farea().index
+    local last_index = #self:parent().items
+    if (index == 1 and dir == LEFT) or (index == last_index and dir == RIGHT) then
+      self.focused_area = self:parent()
+      self:iter_between_areas(dir)
+      return
+    end
+  end
+
+  local next_area = dir == LEFT and self:farea().prev or self:farea().next
+
+  -- If there are no items in the next area, then don't go anywhere
+  if #next_area.items == 0 then return end
+
+  -- If the next area's focused item is an area, go within there
+  if next_area.active_element.type == "area" then
+    dbprint('next area is '..next_area.name)
+    dbprint("next area's active element is an area - going in there!")
+    self.focused_area = next_area
     self:iter_within_area(NONE)
+    dbprint('switched to ' .. self:farea().name .. ' -------------')
     return
   end
 
-  -- If there are no items in the next area, then don't go anywhere
-  local next_area = dir == LEFT and self:farea().prev or self:farea().next
-  if #next_area.items ~= 0 then
-    self.focused_area = next_area
-  end
+  self.focused_area = next_area
+  dbprint('switched to ' .. self:farea().name .. ' -------------')
 end
 
 --- @method iter_within_area
@@ -149,8 +170,8 @@ function navigator:iter_within_area(dir)
     self.focused_area = self:fitem()
     return self:iter_within_area(NONE)
 
-  -- If current focused item is a navitem or an area with no items,
-  -- move to the next one like normal
+    -- If current focused item is a navitem or an area with no items,
+    -- move to the next one like normal
   else
     -- dbprint('focused item is a navitem - iterating like normal')
     self.focused_area:iter(dir)
@@ -186,11 +207,12 @@ end
 function navigator:handle_cleared_area()
   if not self:farea() or not self.root:contains_area(self:farea().name) then
     self.focused_area = self.root
+    self:iter_within_area(NONE)
   end
 end
 
--- █▄▀ █▀▀ █▄█ █▀ 
--- █░█ ██▄ ░█░ ▄█ 
+-- █▄▀ █▀▀ █▄█ █▀
+-- █░█ ██▄ ░█░ ▄█
 
 --- @method check_keybinds
 -- @brief Checks if a key is associated with any keybinds, then
@@ -251,7 +273,7 @@ function navigator:keypressed(key)
   -- dbprint("")
   spaces = ""
   if key == "q" then
-    dbprint("\nDUMP: Current pos is "..self:farea().name.."("..(self:fitem() and self:fitem().index or "-")..")")
+    dbprint("\nDUMP: Current pos is " .. self:farea().name .. "(" .. (self:fitem() and self:fitem().index or "-") .. ")")
     self.root:dump()
   end
 
@@ -317,13 +339,13 @@ function navigator:start()
   self.keygrabber = awful.keygrabber {
     -- TODO: The stop key should depend on whatever keyboard
     -- shortcut opened the navigator
-    stop_key   = "Mod4",
-    stop_event = "press",
-    autostart  = true,
-    keypressed_callback  = function(_, _, key, _)
+    stop_key            = "Mod4",
+    stop_event          = "press",
+    autostart           = true,
+    keypressed_callback = function(_, _, key, _)
       self:keypressed(key)
     end,
-    stop_callback = function()
+    stop_callback       = function()
     end
   }
 end

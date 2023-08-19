@@ -42,10 +42,10 @@ function area:new(args)
   -- Index within parent (areas can be items within another area)
   self.index = 1
 
-  -- TODO: Unused
-  self.circular = args.circular or true
-
+  -- TODO: Don't remember what this does lol
   self.autofocus = args.autofocus or false
+
+  self.is_wrapper = args.is_wrapper or false
 
   -- Doubly linked list stuff
   self.parent = nil
@@ -91,10 +91,9 @@ function area:append(item)
   item.index = #self.items + 1
   item.parent = self
 
-  local last  = self.items[#self.items]
   local first = self.items[1]
+  local last  = self.items[#self.items]
 
-  -- Update item references
   if #self.items > 0 then
     last.next  = item
     first.prev = item
@@ -170,13 +169,13 @@ end
 -- █░▀░█ █ ▄█ █▄▄ 
 
 --- @method dump
--- @brief Print area contents
+-- @brief Print area contents for debugging
 function area:dump(space)
   space = space or ""
   local actelm = self.active_element
   dbprint(space.."'"..self.name.."["..(actelm and actelm.index or 0).."] "..
-        '(P:'..(actelm and self.active_element.prev.index or "-")..
-        ', N:'..(actelm and self.active_element.next.index or "-")..')'.. ": "..#self.items.." items")
+        '(P:'..(self.prev.name or "-")..
+        ', N:'..(self.next.name or "-")..')'.. ": "..#self.items.." items")
   space = space .. "  "
   for i = 1, #self.items do
     if self.items[i].type == "area" then
