@@ -16,14 +16,14 @@ local function add_space() spaces = spaces .. "  " end
 local function sub_space() spaces = string.gsub(spaces, "^  ", "") end
 local function dbprint(msg) if debug_mode then print(spaces .. msg) end end
 
-local LEFT  = -1
+local BACK  = -1
 local NONE  = 0
-local RIGHT = 1
+local FORWARD = 1
 
 local pdir = {
   [0]  = "NONE",
-  [1]  = "RIGHT",
-  [-1] = "LEFT",
+  [1]  = "FORWARD",
+  [-1] = "BACK",
 }
 
 local mod = {
@@ -93,7 +93,7 @@ end
 -- @brief Execute navigation functions for direction keys.
 -- @param type  A navigation type:
 --              horizontal, vertical, jump, release, ends, middle
--- @param dir   LEFT, RIGHT, or NONE
+-- @param dir   BACK, FORWARD, or NONE
 function navigator:handle_navkey(type, dir)
   if not self:farea() then return end
 
@@ -101,11 +101,15 @@ function navigator:handle_navkey(type, dir)
   add_space()
 
   if type == "horizontal" or type == "vertical" then
-    if not self:fitem() then
-      self.focused_area = self:parent()
-      self:iter_between_areas(dir)
+    if self:farea().is_grid then
+      self:iter_within_area_grid(type, dir)
     else
-      self:iter_within_area(dir)
+      if not self:fitem() then
+        self.focused_area = self:parent()
+        self:iter_between_areas(dir)
+      else
+        self:iter_within_area(dir)
+      end
     end
   elseif type == "jump" then
     self:iter_between_areas(dir)
@@ -130,14 +134,14 @@ function navigator:iter_between_areas(dir)
   if self:parent() and self:parent().is_wrapper then
     local index = self:farea().index
     local last_index = #self:parent().items
-    if (index == 1 and dir == LEFT) or (index == last_index and dir == RIGHT) then
+    if (index == 1 and dir == BACK) or (index == last_index and dir == FORWARD) then
       self.focused_area = self:parent()
       self:iter_between_areas(dir)
       return
     end
   end
 
-  local next_area = dir == LEFT and self:farea().prev or self:farea().next
+  local next_area = dir == BACK and self:farea().prev or self:farea().next
 
   -- If there are no items in the next area, then don't go anywhere
   if #next_area.items == 0 then return end
@@ -178,6 +182,61 @@ function navigator:iter_within_area(dir)
   end
 end
 
+--- @method iter_within_area_grid
+-- @brief Iterate within a grid.
+-- @param type horizontal or vertical
+-- @param dir  FORWARD or BACK
+function navigator:iter_within_area_grid(type, dir)
+  if not self:farea() or not self:fitem() then return end
+
+  local p = self:farea()
+  local index = self:fitem().index - 1 -- temp zero-index to make math easier
+  local maxindex = #p.items - 1
+
+  -- These need to be specified for math to work; otherwise
+  -- just iter like normal
+  if not p.num_rows and not p.num_cols then
+    self:iter_within_area(dir)
+    return
+  end
+
+  -- Dir is either 1 (forward) or -1 (back)
+  local newindex
+  if type == "horizontal" then
+    newindex = index + (1 * dir)
+    local oldmod = index % p.num_cols
+    local newmod = newindex % p.num_cols
+
+    if dir == BACK then
+      newindex = (newmod > oldmod and newindex + p.num_cols) or newindex
+
+      if newindex > maxindex then
+        newindex = maxindex
+      end
+    elseif dir == FORWARD then
+      newindex = (newmod < oldmod and newindex - p.num_cols) or newindex
+
+      if newindex > maxindex then
+        newindex = math.floor(index / p.num_cols) * p.num_cols
+      end
+    end
+
+  elseif type == "vertical" then
+    newindex = index + (p.num_cols * dir)
+
+    if newindex < 0 then
+      newindex = (math.floor(maxindex / p.num_cols) * p.num_cols) + (index % p.num_cols)
+      if newindex > maxindex then
+        newindex = newindex - p.num_cols
+      end
+    elseif newindex > maxindex then
+      newindex = index % p.num_cols
+    end
+  end
+
+  self:farea():set_active_element_by_index(newindex + 1)
+end
+
 --- @method jump_to_end
 -- @brief Jump to end of area
 function navigator:jump_to_end(dir)
@@ -185,9 +244,9 @@ function navigator:jump_to_end(dir)
 
   -- dbprint('jump_to_end('..pdir[dir]..')')
 
-  if dir == LEFT then
+  if dir == BACK then
     self:farea():set_active_element_by_index(1)
-  elseif dir == RIGHT then
+  elseif dir == FORWARD then
     local num_items = #self:farea().items
     self:farea():set_active_element_by_index(num_items)
   end
@@ -292,10 +351,10 @@ function navigator:keypressed(key)
 
   -- Determine if navigating left or right through tree
   local dir = NONE
-  if key == "j" or key == "l" or key == "Tab" then dir = RIGHT end
-  if key == "h" or key == "k" or key == "BackSpace" then dir = LEFT end
-  if type == "ends" and key == "g" then dir = LEFT end
-  if type == "ends" and key == "G" then dir = RIGHT end
+  if key == "j" or key == "l" or key == "Tab" then dir = FORWARD end
+  if key == "h" or key == "k" or key == "BackSpace" then dir = BACK end
+  if type == "ends" and key == "g" then dir = BACK end
+  if type == "ends" and key == "G" then dir = FORWARD end
 
   -- Call navigation function
   local valid_nav_types = {

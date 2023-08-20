@@ -47,6 +47,11 @@ function area:new(args)
 
   self.is_wrapper = args.is_wrapper or false
 
+  -- Grid stuff
+  self.is_grid  = args.is_grid or false
+  self.num_rows = args.num_rows
+  self.num_cols = args.num_cols
+
   -- Doubly linked list stuff
   self.parent = nil
   self.next = self
