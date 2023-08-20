@@ -231,13 +231,17 @@ end
 -- █▀█ █▄▄ ░█░ █ █▄█ █░▀█ ▄█ 
 
 function area:select_on()
-  if self.active_element then self.active_element:select_on() end
-  if self.widget then self.widget:select_on() end
+  if self.active_element and self.active_element.emit_signal then
+    self.active_element:emit_signal("mouse::enter")
+  end
+  if self.widget then self.widget:emit_signal("mouse::enter") end
 end
 
 function area:select_off()
-  if self.active_element then self.active_element:select_off() end
-  if self.widget then self.widget:select_off() end
+  if self.active_element and self.active_element.emit_signal then
+    self.active_element:emit_signal("mouse::leave")
+  end
+  if self.widget then self.widget:emit_signal("mouse::leave") end
 end
 
 function area:release() end

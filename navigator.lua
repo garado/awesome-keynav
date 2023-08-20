@@ -118,7 +118,7 @@ function navigator:handle_navkey(type, dir)
   elseif type == "middle" then
     self:jump_to_middle()
   elseif type == "release" then
-    self:fitem():release()
+    self:fitem():emit_signal("button::press")
   end
 end
 
@@ -174,10 +174,10 @@ function navigator:iter_within_area(dir)
     self.focused_area = self:fitem()
     return self:iter_within_area(NONE)
 
-    -- If current focused item is a navitem or an area with no items,
+    -- If current focused item is a navwidget or an area with no items,
     -- move to the next one like normal
   else
-    -- dbprint('focused item is a navitem - iterating like normal')
+    -- dbprint('focused item is a navwidget - iterating like normal')
     self.focused_area:iter(dir)
   end
 end
@@ -322,11 +322,11 @@ end
 function navigator:keypressed(key)
   self.last_area = self.focused_area
 
-  if self:farea().name == "root" then
-    if #self:farea().items > 0 and self:farea().items[1].autofocus then
-      self:iter_within_area(NONE)
-    end
-  end
+  -- if self:farea().name == "root" then
+  --   if #self:farea().items > 0 and self:farea().items[1].autofocus then
+  --     self:iter_within_area(NONE)
+  --   end
+  -- end
 
   -- Debug stuff
   -- dbprint("")
