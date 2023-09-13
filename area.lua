@@ -16,12 +16,6 @@ local function dbprint(...)
   if debug then print(...) end
 end
 
-local pdir = {
-  [0]  = "NONE",
-  [1]  = "RIGHT",
-  [-1] = "LEFT",
-}
-
 local area = {}
 area.__index = area
 
@@ -71,6 +65,10 @@ function area:new(args)
   -- Reference to navigator
   self.nav = args.nav
 
+  if args.parent_area then
+    args.parent_area:append(self)
+  end
+
   return self
 end
 
@@ -86,6 +84,7 @@ end
 -- █ █░▀█ ▄█ ██▄ █▀▄ ░█░ ▄▀░░ █▄▀ ██▄ █▄▄ ██▄ ░█░ ██▄ 
 
 function area:insert_at(index, item)
+  print('INSERT AT UNIMPLEMENTED')
 end
 
 function area:prepend(item) end
@@ -95,6 +94,10 @@ function area:prepend(item) end
 function area:append(item)
   item.index = #self.items + 1
   item.parent = self
+
+  if item.type == "area" then
+    item.nav = self.nav
+  end
 
   local first = self.items[1]
   local last  = self.items[#self.items]
@@ -111,6 +114,34 @@ function area:append(item)
   end
 
   self.items[#self.items+1] = item
+end
+
+--- @method remove
+-- @brief Remove an element from this area by index.
+-- TODO: Needs serious testing
+function area:remove(index)
+  print('Area: Removing by index')
+  -- Get index of currently active element
+  local active_idx = 1
+  for i = 1, #self.items do
+    if self.items[i] == self.active_element then
+      active_idx = i
+    end
+  end
+
+  -- TODO: What if it's the last remaining element?
+  if index == active_idx then
+    self:iter()
+  else
+    -- Fix doubly linked list references
+    local target_prev = self.items[index].prev
+    local target_next = self.items[index].next
+    target_prev.next = target_next
+    target_next.prev = target_prev
+    table.remove(self.items, index)
+    self:update_indices()
+    return
+  end
 end
 
 --- @method remove_area
@@ -170,6 +201,10 @@ function area:set_active_element_by_index(index)
   self.active_element = self.items[index]
 end
 
+function area:force_active()
+  if self.nav then self.nav:set_focused_area(self) end
+end
+
 -- █▀▄▀█ █ █▀ █▀▀ 
 -- █░▀░█ █ ▄█ █▄▄ 
 
@@ -179,8 +214,8 @@ function area:dump(space)
   space = space or ""
   local actelm = self.active_element
   dbprint(space.."'"..self.name.."["..(actelm and actelm.index or 0).."] "..
-        '(P:'..(self.prev.name or "-")..
-        ', N:'..(self.next.name or "-")..')'.. ": "..#self.items.." items")
+    '(P:'..(self.prev.name or "-")..
+    ', N:'..(self.next.name or "-")..')'.. ": "..#self.items.." items")
   space = space .. "  "
   for i = 1, #self.items do
     if self.items[i].type == "area" then
@@ -234,14 +269,20 @@ function area:select_on()
   if self.active_element and self.active_element.emit_signal then
     self.active_element:emit_signal("mouse::enter")
   end
-  if self.widget then self.widget:emit_signal("mouse::enter") end
+
+  if self.widget and self.widget.emit_signal then
+    self.widget:emit_signal("mouse::enter")
+  end
 end
 
 function area:select_off()
   if self.active_element and self.active_element.emit_signal then
     self.active_element:emit_signal("mouse::leave")
   end
-  if self.widget then self.widget:emit_signal("mouse::leave") end
+
+  if self.widget and self.widget.emit_signal then
+    self.widget:emit_signal("mouse::leave")
+  end
 end
 
 function area:release() end

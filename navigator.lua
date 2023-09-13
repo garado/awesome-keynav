@@ -1,13 +1,15 @@
 -- █▄░█ ▄▀█ █░█ █ █▀▀ ▄▀█ ▀█▀ █▀█ █▀█
 -- █░▀█ █▀█ ▀▄▀ █ █▄█ █▀█ ░█░ █▄█ █▀▄
 
--- Responsible for moving around through the navtree and
--- executing keybinds.
+-- Responsible for moving around through the navtree and executing keybinds.
 
-local awful   = require("awful")
-local gobject = require("gears.object")
-local path    = (...):match("(.-)[^%.]+$")
-local math    = math
+local awful      = require("awful")
+local gobject    = require("gears.object")
+local gstring    = require("gears.string")
+local gcolor     = require("gears.color")
+local path       = (...):match("(.-)[^%.]+$")
+local capi       = { selection = selection }
+local math       = math
 
 -- For printing stacktrace
 local debug_mode = false
@@ -16,17 +18,17 @@ local function add_space() spaces = spaces .. "  " end
 local function sub_space() spaces = string.gsub(spaces, "^  ", "") end
 local function dbprint(msg) if debug_mode then print(spaces .. msg) end end
 
-local BACK  = -1
-local NONE  = 0
-local FORWARD = 1
+local BACK        = -1
+local NONE        = 0
+local FORWARD     = 1
 
-local pdir = {
-  [0]  = "NONE",
-  [1]  = "FORWARD",
-  [-1] = "BACK",
+local pdir        = {
+  [0]   = "NONE",
+  [1]   = "FORWARD",
+  [ -1] = "BACK",
 }
 
-local mod = {
+local mod         = {
   ["Shift_L"] = true,
   ["Shift_R"] = true,
   ["Control_L"] = true,
@@ -35,7 +37,7 @@ local mod = {
 
 ---
 
-local navigator = {}
+local navigator   = {}
 navigator.__index = navigator
 
 setmetatable(navigator, {
@@ -48,14 +50,14 @@ function navigator:new(args)
   args = args or {}
   self = setmetatable(gobject {}, navigator)
 
-  -- This has to be a string because when checking for keybinds
-  -- with multiple keys, we concat last_key with the current key
-  self.last_key = "nil"
+  self.stop_key = args.stop_key or "Mod4"
+  self.last_key = ""
 
   -- Set up root area
   self.root = require(path .. "area")({
-    name = "root",
-    nav  = self,
+    name      = "root",
+    nav       = self,
+    autofocus = args.autofocus,
   })
 
   if args.items then
@@ -144,11 +146,11 @@ function navigator:iter_between_areas(dir)
   local next_area = dir == BACK and self:farea().prev or self:farea().next
 
   -- If there are no items in the next area, then don't go anywhere
-  if #next_area.items == 0 then return end
+  -- if #next_area.items == 0 then return end
 
   -- If the next area's focused item is an area, go within there
   if next_area.active_element.type == "area" then
-    dbprint('next area is '..next_area.name)
+    dbprint('next area is ' .. next_area.name)
     dbprint("next area's active element is an area - going in there!")
     self.focused_area = next_area
     self:iter_within_area(NONE)
@@ -220,7 +222,6 @@ function navigator:iter_within_area_grid(type, dir)
         newindex = math.floor(index / p.num_cols) * p.num_cols
       end
     end
-
   elseif type == "vertical" then
     newindex = index + (p.num_cols * dir)
 
@@ -268,6 +269,13 @@ function navigator:handle_cleared_area()
     self.focused_area = self.root
     self:iter_within_area(NONE)
   end
+end
+
+function navigator:set_focused_area(area)
+  self.last_area = self:farea()
+  self:farea():select_off()
+  self.focused_area = area
+  self:farea():select_on()
 end
 
 -- █▄▀ █▀▀ █▄█ █▀
@@ -396,16 +404,12 @@ function navigator:start()
   self.root:verify_nav_references()
 
   self.keygrabber = awful.keygrabber {
-    -- TODO: The stop key should depend on whatever keyboard
-    -- shortcut opened the navigator
-    stop_key            = "Mod4",
+    stop_key            = self.stop_key,
     stop_event          = "press",
     autostart           = true,
     keypressed_callback = function(_, _, key, _)
       self:keypressed(key)
     end,
-    stop_callback       = function()
-    end
   }
 end
 
